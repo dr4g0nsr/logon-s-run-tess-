@@ -1,0 +1,1141 @@
+
+
+
+; (RE)SET & co
+; ROTATION & MORE
+; DRAW & FILL
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	module rot ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; (RE)SET & co
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.reset.pts
+	 	; HL = where points & more are stored	
+			ld (@rot.adr.tab.pts),hl
+		; how many points (list ends at -1)
+			ld b,0:	ld a,-1
+@rot.reset.pts.nbpts_loop
+				inc b:inc hl:inc hl:inc hl
+				cp (hl)
+				jr nz,@rot.reset.pts.nbpts_loop
+		; nb pts
+			ld a,b:ld (@rot.nbpts),a
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.reset_all
+@rot.reset.pts_then_object.with_default_zeros
+	push hl
+		call scroller.init.default_zeros.wo_calc
+	pop hl
+@rot.reset.pts_then_object
+	call @rot.reset.pts
+	ld hl,(@rot.adr.tab.pts)
+@rot.reset.object ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		; how many points (list ends at -1)
+			ld b,0:	ld a,-1
+@rot.reset.object.nbpts_loop
+				inc b:inc hl:inc hl:inc hl
+				cp (hl)
+				jr nz,@rot.reset.object.nbpts_loop
+		; sides are stored after -1
+			inc hl:ld (rot.adr.tab.sides),hl
+		; nb pts
+			ld a,b
+				ld h,0:ld l,a:add hl,hl
+				ld (@scroller.precalc_to.nbpts_x2+1),hl
+@rot.reset.object.sides_only_jr
+			call rot.gen.sides_full
+			call rot.gen.segs_by_convobj
+		; how many segs?
+			ld hl,@rot.tab.segs	
+			ld b,0:	ld a,-1
+@rot.reset.object.nbsegs_loop
+				inc b:inc hl:inc hl
+				cp (hl)
+				jr nz,@rot.reset.object.nbsegs_loop
+			ld a,b:ld (@rot.nbsegs),a
+	ret
+@rot.reset.object.sides_only
+		ld (rot.adr.tab.sides),hl
+		jr @rot.reset.object.sides_only_jr
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.reset.scr_width ; input: A = screen width (chars 40/48..63)
+		ld (sys.crtcreg1val+1),a
+@rot.reset.scr_width_wo_set_CRTC
+		add a,a
+		ld (sprite.scr_width1+1),a
+;		ld (spresto.scr_width1+1),a
+		ld (@rot.scr.width),a
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.reset.size_spr ; input C= nb de shift à faire , ex si 5 c'est 32 octets, du 16x16 caractères	
+				    ; valeur possible = 4 pour  8x8  caractères mode 1, #0400 requis
+				    ; valeur possible = 5 pour 16x16 caractères mode 1, #1000 requis
+				    ; valeur possible = 6 pour 32x32 caractères mode 1, #4000 requis /!\ certes attention mais çà marche
+				    ;                   et si ld hl,#C000:ld (@rot.dy_center_iso+1),hl
+				    ;                 = 6 pour 32x16 caractères mode 1, #2000 requis :)
+	call @rot.reset.size_spr.gen_tab_shift ; call +3 pour ne pas générer (au début...) tab_shift qui prend #200
+	;ld a,#20
+		ld a,1:ld b,c:add a,a:djnz $-1
+			ld (@rot.convobj.added_width+1),a			; fill
+			ld (@rot.fill.bit_width+1),a				; fill
+	;ld a,#21
+		inc a
+			ld (sprite.set_sprsize.xshunt+1),a			; to scr
+;			ld (spresto.set_sprsize.xshunt+1),a			; to scr
+		dec a
+	;ld de,#FFE0
+		ld hl,0:ld e,a:ld d,0:or a:sbc hl,de
+			ld (@rot.width_spr_sp+1),hl					; line
+	;ld hl,#4000
+		ld h,a:ld l,0:add hl,hl
+			ld (@rot.dx_center_iso+1),hl				; rot
+@rot.reset.size_spr.fix_height
+			ld (@rot.dy_center_iso+1),hl				; rot
+	;ld a,#80-1
+		add a,a:add a,a:dec a
+			ld (@rot.height_spr_mod1+1),a:ld (@rot.height_spr_mod4+1),a:ld (@rot.height_spr_mod5+1),a ; line & fill		
+			ld (@rot.height_scr_mod5+1),a:ld (@rot.height_scr_mod6+1),a:ld (@rot.height_scr_mod8+1),a ; to scr
+	ret
+@rot.reset.size_spr.gen_tab_shift	
+	ld a,8:sub c
+	ld (@rot.shift_for_width1+1),a:ld (@rot.shift_for_width2+1),a:ld (@rot.shift_for_width3+1),a
+	ret
+; 	ld de,@sys.tab.shift 								; line
+; @rot.reset.size.loop
+; 	ld h,0:ld l,e
+; 	ld b,c:add hl,hl:djnz $-1
+; 	ex de,hl:ld (hl),e:inc h:ld (hl),d:dec h:ex de,hl
+; 	inc e
+; 	jr nz,@rot.reset.size.loop
+; 	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; ROTATION & MORE
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sides_full
+;	if debug.rot.tab
+;		xor a:ld (gen.sides_full.nb_sides+1),a
+;	endif
+	ld hl,tab.convobj.1pt:ld (hl),-1:ld (adr.convobj.1pt+1),hl
+	ld hl,tab.segs:ld (hl),-1:ld (gen.sides_full.tab.segs+1),hl
+	ld hl,tab.adr_convobj:ld (adr.adr_convobj+1),hl
+@rot.adr.tab.sides equ $+1:	ld de,0
+	ld hl,tab.sides_full
+gen.sides_full.loop_convobj
+	push hl:
+adr.convobj.1pt
+		ld hl,0
+		ld a,(de):ld (hl),a:inc hl:inc de ; saving point for Z calculation
+		ld (hl),-1
+		ld (adr.convobj.1pt+1),hl
+	pop hl
+gen.sides_full.loop	
+	ld a,(de):bit 7,a:jr z,ana9
+		neg:dec a
+		ld bc,(adr.adr_convobj+1)
+			ld (bc),a:inc bc:inc bc:inc bc:ld (adr.adr_convobj+1),bc
+		ld (hl),-1:inc hl
+			; update next tab.segs
+			push hl
+				ld hl,(gen.sides_full.tab.segs+1)
+				inc hl:ld a,(hl):cp -1:jr nz,$-4
+				ld (gen.sides_full.tab.segs+1),hl
+			pop hl
+		inc de:ld a,(de):bit 7,a:jr z,gen.sides_full.loop_convobj
+		ld (hl),-1
+; 		if debug.rot.tab
+; 			push hl:ld de,debug.rot.tab.store_adr
+; 			;rot.tab.pts_proj & rot.tab.pts_proj.backup
+; 			ld hl,(@scroller.precalc_to.nbpts_x2+1):add hl,hl:call debug.rot.tab.store_call
+; 			;tab.sides_full
+; 			pop hl:inc hl:ld bc,tab.sides_full:or a:sbc hl,bc:call debug.rot.tab.store_call
+; 			;tab.convobj.1pt 
+; 			ld hl,(adr.convobj.1pt+1):inc hl:ld bc,tab.convobj.1pt:or a:sbc hl,bc:call debug.rot.tab.store_call
+; 			;tab.segs
+; 			ld hl,(gen.sides_full.tab.segs+1):inc hl:ld bc,tab.segs:or a:sbc hl,bc:call debug.rot.tab.store_call
+; 			;rot.tab.sides_seen
+; gen.sides_full.nb_sides ld hl,0:call debug.rot.tab.store_call
+; 		endif
+		ret
+ana9 	
+; 		if debug.rot.tab
+; 			push af
+; 			ld a,(gen.sides_full.nb_sides+1):inc a:ld (gen.sides_full.nb_sides+1),a
+; 			pop af
+; 		endif
+		ld (gen.sides_full.backup_adr_1st_pt+1),de
+		ld (gen.sides_full.1st_pt+1),a:inc de:ld b,a
+		push hl:inc hl:inc hl:inc hl:inc hl
+ana1		ld a,(de):inc de:bit 7,a:jr nz,gen.sides_full.last_pt:ld c,a
+				call gen.sides_full.find_seg ; b -> c
+				ld (hl),a:inc hl
+				ld b,c ; << pt
+				jr ana1
+gen.sides_full.last_pt
+			res 7,a ; pen is #80+...
+			ld (gen.sides_full.pen+1),a
+gen.sides_full.1st_pt
+			ld c,0 ; == 1st pt
+			ld a,b:ld (gen.sides_full.last_pt_backup+1),a
+			call gen.sides_full.find_seg ; b -> c
+			ld (hl),a:inc hl:ld (hl),-1:inc hl:ld (gen.sides_full.next_sds_f+1),hl
+		pop hl
+gen.sides_full.backup_adr_1st_pt						
+		ld bc,0
+gen.sides_full.pen
+		ld a,0:ld (hl),a:inc hl 			; pen
+		ld a,(bc):ld (hl),a:inc hl:inc bc 	; pt1 for side un/seen check		
+		ld a,(bc):ld (hl),a:inc hl:inc bc 	; pt2 for side un/seen check	
+gen.sides_full.last_pt_backup	
+		ld a,0:ld (hl),a:inc hl:inc bc 	; pt3 for side un/seen check		
+gen.sides_full.next_sds_f
+	ld hl,0
+	jp gen.sides_full.loop
+gen.sides_full.find_seg
+			push hl:push bc
+				ld a,c:sub b:jr nc,ana7
+				ld a,c:ld c,b:ld b,a 		; b<c
+gen.sides_full.tab.segs
+ana7			ld hl,tab.segs
+ana5			ld a,(hl):cp -1:jr z,ana2
+					cp b:jr nz,ana3
+					;1st pt of seg is =
+						inc hl:ld a,(hl):cp c:jr nz,ana4
+					;2nd pt of seg is =
+						ld a,l:sub LOW (tab.segs+1):srl a
+							jr ana6
+ana4					;2nd pt of seg is <>
+							inc hl:jr ana5					
+ana3				;1st pt of seg is <>
+						inc hl:inc hl:jr ana5					
+ana2			;segment not found
+					ld a,l:sub LOW tab.segs:srl a
+					ld (hl),b:inc hl:ld (hl),c:inc hl:ld (hl),-1
+ana6			;segment known (--> A)
+			pop bc:pop hl
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.segs_by_convobj
+		ld hl,tab.adr_convobj:ld (adr.adr_convobj+1),hl ; reset
+@rot.tab.convobj.fix1 equ $+1
+		ld hl,tab.convobj:ld (adr.convobj+1),hl ; reset
+		ld bc,tab.sides_full
+gen.segs_by_convobj.loop_into_fullobj
+		ld a,(bc):cp -1:jr nz,gen.segs_by_convobj.still_some_conver_object
+; 		if debug.rot.tab
+; 			ld de,debug.rot.tab.store_adr+5*2
+; 			;tab.adr_convobj 
+; 			ld hl,(adr.adr_convobj+1):ld bc,tab.adr_convobj:or a:sbc hl,bc:call debug.rot.tab.store_call
+; 			;tab.convobj 
+; @rot.tab.convobj.fix1 equ $+3+1
+; 			ld hl,(adr.convobj+1):ld bc,tab.convobj:or a:sbc hl,bc:call debug.rot.tab.store_call
+; 		endif
+		ret ; end of all convex objects
+gen.segs_by_convobj.still_some_conver_object
+		ld hl,(adr.convobj+1):ld (hl),-1:ex de,hl ; list of segments is reset
+			; current adress of convex object is set to current adress within list of segments
+adr.adr_convobj
+			ld hl,0:inc hl:ld (hl),e:inc hl:ld (hl),d:inc hl:ld (adr.adr_convobj+1),hl 
+gen.segs_by_convobj.loop_into_convobj
+		ld a,(bc):cp -1:jr nz,gen.segs_by_convobj.loop_into_convobj_do
+			; end of current convex object
+adr.convobj
+			ld hl,0; end of list of segments for current conv object
+				ld a,(hl):inc hl:cp -1:jr nz,$-2-1-1:ld (adr.convobj+1),hl
+			inc bc
+			jr gen.segs_by_convobj.loop_into_fullobj
+gen.segs_by_convobj.loop_into_convobj_do
+		inc bc ; pen
+		inc bc:inc bc:inc bc ; 3 1st points (for checking seen sides)
+gen.segs_by_convobj.loop_into_side
+		ld a,(bc):ld e,a:ld d,-1 ; read segment number
+			ld hl,(adr.convobj+1)
+gen.segs_by_convobj.loop_for_segs
+				ld a,(hl):cp e:jr z,gen.segs_by_convobj.seg_ok
+				inc hl:cp d:jr nz,gen.segs_by_convobj.loop_for_segs
+				ld (hl),d:dec hl:ld (hl),e
+gen.segs_by_convobj.seg_ok		
+		inc bc:ld a,(bc):cp -1:jr nz,gen.segs_by_convobj.loop_into_side
+		inc bc:jr gen.segs_by_convobj.loop_into_convobj				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sincos_16bits 
+@rot.ax_16bits equ $+1 : ld hl,0 :call @sys.cosinus_16bits:ld (c1_1+1),hl
+				ld hl,(ax_16bits):call   @sys.sinus_16bits:ld (s1_1+1),hl
+@rot.ay_16bits equ $+1 : ld hl,0 :call @sys.cosinus_16bits:ld (c2_1+1),hl
+				ld hl,(ay_16bits):call   @sys.sinus_16bits:ld (s2_1+1),hl
+@rot.az_16bits equ $+1 : ld hl,0 :call @sys.cosinus_16bits:ld (c3_1+1),hl
+				ld hl,(az_16bits):call   @sys.sinus_16bits:ld (s3_1+1),hl
+	; http://jeux.developpez.com/faq/math/?page=transformations
+	; rotation	x <	z < y
+c2_1	ld bc,0
+s3_1	ld de,0
+				call sys.mul.float_b14:ld (c2s3_1+1),hl
+s2_1	ld bc,0
+		ld de,(s3_1+1)
+				call sys.mul.float_b14:ld (s2s3_1+1),hl
+	; xx =  c2*c3
+		ld bc,(c2_1+1)
+c3_1	ld de,0
+				call sys.mul.float_b14
+@rot.mulu equ $+1 :	ld bc,0:ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (xx+1),hl
+	; xy = -c1*c2s3-s1*s2
+c2s3_1	ld bc,0
+c1_1	ld de,0
+				call sys.mul.float_b14:push hl
+s1_1	ld bc,0
+		ld de,(s2_1+1)
+				call sys.mul.float_b14
+		pop bc:add hl,bc
+		ex de,hl:xor a:ld h,a:ld l,a:sbc hl,de
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (xy+1),hl
+	; xz = s1*c2s3-c1*s2
+		ld bc,(c1_1+1)
+		ld de,(s2_1+1)
+				call sys.mul.float_b14:push hl
+		ld bc,(c2s3_1+1)
+		ld de,(s1_1+1)
+				call sys.mul.float_b14
+		pop bc:xor a:sbc hl,bc
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (xz+1),hl
+	; yx = s3
+		ld bc,(mulu)
+		ld de,(s3_1+1):call @sys.mul.16sx16s_24smax:ld (yx+1),hl
+	; yy = c1*c3 
+		ld bc,(c1_1+1)
+		ld de,(c3_1+1)
+				call sys.mul.float_b14
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (yy+1),hl
+	; yz = -s1*c3 
+		ld bc,(s1_1+1)
+		ld de,(c3_1+1)
+				call sys.mul.float_b14
+		ex de,hl:xor a:ld h,a:ld l,a:sbc hl,de
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (yz+1),hl
+	; zx = s2*c3 
+		ld bc,(s2_1+1):ld de,(c3_1+1):call sys.mul.float_b14
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (zx+1),hl
+	; zy = -c1*s2s3+s1*c2
+s2s3_1	ld bc,0   :ld de,(c1_1+1):call sys.mul.float_b14:push hl
+		ld bc,(s1_1+1):ld de,(c2_1+1):call sys.mul.float_b14
+		pop bc:xor a:sbc hl,bc
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (zy+1),hl
+	; zz = s1*s2s3+c1*c2
+		ld bc,(s2s3_1+1):ld de,(s1_1+1):call sys.mul.float_b14:push hl
+		ld bc,(c1_1+1):ld de,(c2_1+1):call sys.mul.float_b14
+		pop bc:add hl,bc
+				ld bc,(mulu):ex de,hl:call @sys.mul.16sx16s_24smax
+				ld (zz+1),hl
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sincos_rot_iso
+		call @rot.gen.sincos_16bits
+@rot.gen.pts_rot_iso
+		ld ix,(adr.tab.pts):ld de,3
+		ld iy,rot.tab.pts_proj:ld bc,4
+@rot.nbpts equ $+1
+nb_pts	ld h,0
+		exx
+gen.pts_rot_iso.loop
+			;x
+xx			ld bc,0:ld a,(ix+0):call @sys.mul.8sx16s:push hl
+xy			ld bc,0:ld a,(ix+1):call @sys.mul.8sx16s:push hl
+xz			ld bc,0:ld a,(ix+2):call @sys.mul.8sx16s
+			pop bc:add hl,bc:pop bc:add hl,bc
+			add hl,hl:add hl,hl
+dx_center_iso ld de,0:add hl,de
+			ld (iy+0),l
+			ld (iy+1),h
+			;y
+yx			ld bc,0:ld a,(ix+0):call @sys.mul.8sx16s:push hl
+yy			ld bc,0:ld a,(ix+1):call @sys.mul.8sx16s:push hl
+yz			ld bc,0:ld a,(ix+2):call @sys.mul.8sx16s
+			pop bc:add hl,bc:pop bc:add hl,bc
+			add hl,hl:add hl,hl
+dy_center_iso ld de,0:add hl,de
+			ld (iy+2),l
+			ld (iy+3),h
+		exx:add ix,de:add iy,bc:dec h:exx
+	 	jr nz,gen.pts_rot_iso.loop	
+	 	ret	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sincos_rot_not_iso
+		call @rot.gen.sincos_rot_iso
+@rot.gen.pts_rot_not_iso
+		ld ix,(adr.tab.pts):ld de,3
+		ld iy,rot.tab.pts_proj:ld bc,4
+		ld a,(@rot.nbpts):ld h,a
+		exx
+gen.pts_rot_not_iso.loop
+			;z 
+			ld bc,(zx+1):ld a,(ix+0):call @sys.mul.8sx16s:push hl
+			ld bc,(zy+1):ld a,(ix+1):call @sys.mul.8sx16s:push hl
+			ld bc,(zz+1):ld a,(ix+2):call @sys.mul.8sx16s
+			pop bc:add hl,bc:pop bc:add hl,bc
+			;mulz/mulu
+gen.pts_rot.mulz	ld a,0:ld bc,hl:call @sys.mul.8sx16s
+gen.pts_rot.mulu	ld de,#100:add hl,de
+			push hl:push hl
+			;x
+			ld l,(iy+0):ld h,(iy+1)
+			ld de,(dx_center_iso+1):or a:sbc hl,de
+			ex de,hl
+			pop bc:call @sys.mul.16sx16s_24smax
+			ld de,(dx_center_iso+1):add hl,de
+			ld (iy+0),l:ld (iy+1),h
+			;y
+			ld l,(iy+2):ld h,(iy+3)
+			ld de,(dy_center_iso+1):or a:sbc hl,de
+			ex de,hl
+			pop bc:call @sys.mul.16sx16s_24smax
+			ld de,(dy_center_iso+1):add hl,de
+			ld (iy+2),l:ld (iy+3),h
+		exx:add ix,de:add iy,bc:dec h:exx
+	 	jr nz,gen.pts_rot_not_iso.loop	
+	 	ret	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sides_seen
+		ld hl,tab.sides_seen
+		exx
+		ld bc,tab.sides_full
+gen.sides_seen.loop
+		ld a,(bc):cp -1:jr nz,gen.sides_seen.loop_do
+			inc bc:ld a,(bc):cp -1:ret z
+gen.sides_seen.loop_do
+		inc bc ; pen
+		bit 6,a ; case of always seen sides...
+			jr nz,gen.sides_seen3
+		; pt1
+			ld a,(bc)
+				macro hl_pts_spr
+					ld h,HIGH tab.pts_spr:add a,a:ld l,a
+ 			 	endm
+			hl_pts_spr
+			ld a,(hl):ld ixh,a ; x1
+			inc l ; 8 bits 
+			ld a,(hl):ld ixl,a ; y1
+			inc bc		
+		; pt2
+			ld a,(bc)
+			hl_pts_spr
+			ld a,(hl):ld iyh,a ; x2
+			inc l ; 8 bits 
+			ld a,(hl):ld iyl,a ; y2
+			inc bc		
+		; pt3
+			ld a,(bc)
+			hl_pts_spr
+			ld a,(hl):ld (x3+1),a
+			inc l ; 8 bits 
+			ld a,(hl) ; y3
+			inc bc		
+			push bc 
+					;c=(x3-x1)*(y2-y1)-(x2-x1)*(y3-y1)
+	if 0
+					; a = y3
+				sub ixl  ;y1
+				ld d,a
+				ld a,iyh ;x2
+				sub ixh  ;x1
+				ld e,a
+				call @sys.mul.8sx8s ; hl=d*e
+					push hl
+					;
+x3			ld a,0
+				sub ixh ; x1
+				ld e,a
+				ld a,iyl ;y2
+				sub ixl
+				ld d,a
+				call @sys.mul.8sx8s ; hl=d*e
+					pop de
+					xor a:sbc hl,de					
+					bit 7,h:jr nz,gen.sides_seen2
+						inc a
+	else	
+					; a = y3
+				sub ixl  ;y1
+				ld c,a
+				ld b,0:jr nc,2+$+1:dec b
+				ld a,iyh ;x2
+				sub ixh  ;x1
+				ld e,a
+				ld d,0:jr nc,2+$+1:dec d
+				call @sys.mul.16sx16s_24smax ; hlc = hbc = bc * de
+;	break
+					ld a,h:ld (gen.sides_seen_a+1),a
+					push bc
+x3				ld a,0
+				sub ixh ; x1
+				ld c,a
+				ld b,0:jr nc,2+$+1:dec b
+				ld a,iyl ;y2
+				sub ixl
+				ld e,a
+				ld d,0:jr nc,2+$+1:dec d
+				call @sys.mul.16sx16s_24smax ; hlc = hbc = bc * de
+;	break
+					ld a,h
+					ld hl,bc
+					pop de
+					or a:sbc hl,de
+					jr nc,2+$+1:dec a
+gen.sides_seen_a	sub 0					
+					bit 7,a:ld a,0:jr nz,gen.sides_seen2
+						inc a
+	endif
+gen.sides_seen2
+			pop bc ; useless since @sys.mul.8sx8s keeps bc 
+gen.sides_seen3
+			exx:ld (hl),a:inc hl:exx
+gen.sides_seen1	ld a,(bc):inc bc:cp -1:jr nz,gen.sides_seen1
+			jp gen.sides_seen.loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.segs_inked
+@rot.tab.segs_inked.fix1 equ $+1
+				ld hl,tab.segs_inked
+@rot.nbsegs equ $+1 : ld b,0:xor a
+gen.segs_inked1	ld (hl),a:inc hl:djnz gen.segs_inked1 ; reset colors
+			;
+			ld de,tab.sides_seen
+			ld bc,tab.sides_full
+calc.segs.loop		
+			ld a,(bc):cp -1:jr nz,calc.segs.loop_do
+			inc bc:ld a,(bc):cp -1:ret z
+calc.segs.loop_do
+			res 6,a:ld (calc.segs.pen+1),a:inc bc ; pen as 1st byte
+			ld a,(de):inc de:or a:jr nz,calc.segs.seen
+			; side in not seen
+gen.segs_inked3	ld a,(bc):inc bc:cp -1:jr nz,gen.segs_inked3		; til' end of side
+				jr calc.segs.loop 									; til' end of convex object
+calc.segs.seen;side is seen and must be draw
+				inc bc:inc bc:inc bc ; 3 first points for checking (not?)seen side
+calc.segs.loop_in_side									
+				ld a,(bc):inc bc ; read a segment number
+				cp -1:jr z,calc.segs.loop 
+@rot.tab.segs_inked.fix2 equ $+1
+				ld hl,tab.segs_inked:add a,l:ld l,a:jr nc,2+$+1:inc h
+calc.segs.pen	ld a,0:xor (hl):ld (hl),a 
+				jr calc.segs.loop_in_side
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.draw.segs_convobj
+		; input? DE = adr to list of segments (translation to dithered colors? outside...)
+		ld hl,#FF00:ld (convobj.xminmax+1),hl:ld (convobj.yminmax+1),hl
+		ex de,hl
+draw.segs_convobj.loop_into_convobj
+		ld a,(hl):cp -1:jr nz,draw.segs_convobj.do_into_convobj
+			; end of convobj
+			ret
+draw.segs_convobj.do_into_convobj
+		push hl
+			call draw.seg
+		pop hl
+		inc hl:jr draw.segs_convobj.loop_into_convobj				
+draw.seg ; input? a is seg number
+			ld (draw.seg.number_backup+1),a
+			ld de,tab.segs:add a,a:add a,e:ld e,a:jr nc,2+$+1:inc d
+draw.seg.number_backup ld a,0
+@rot.tab.segs_inked.fix3 equ $+1
+			ld bc,tab.segs_inked:add a,c:ld c,a:jr nc,2+$+1:inc b
+				ld a,(bc):or a:ret z:ex af,af ; pen backup to af'
+				ld a,(de)
+				hl_pts_spr
+				ld b,(hl) 		; HIGH x0
+				inc l:ld c,(hl)	; HIGH y0 - 8 bits
+				inc de:ld a,(de)	
+				hl_pts_spr
+				ld d,(hl)		; HIGH x1
+				inc l:ld e,(hl)	; HIGH y1 - 8 bits
+convobj.xminmax			ld hl,0
+						ld a,b:sub h:jr nc,2+$+1:ld h,b ; xmin = h 
+						ld a,d:sub h:jr nc,2+$+1:ld h,d ; xmin = h
+						ld a,l:sub b:jr nc,2+$+1:ld l,b ; xmax = l
+						ld a,l:sub d:jr nc,2+$+1:ld l,d ; xmax = l
+					ld (convobj.xminmax+1),hl
+convobj.yminmax			ld hl,0
+						ld a,c:sub h:jr nc,2+$+1:ld h,c ; ymin = h 
+						ld a,e:sub h:jr nc,2+$+1:ld h,e ; ymin = h
+						ld a,l:sub c:jr nc,2+$+1:ld l,c ; ymax = l
+						ld a,l:sub e:jr nc,2+$+1:ld l,e ; ymax = l
+					ld (convobj.yminmax+1),hl
+				ex af,af
+				jp @rot.draw_line
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sides_segs_zfake
+	call @rot.gen.sides_seen
+	call @rot.gen.segs_inked
+@rot.gen.zfake ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		ld de,tab.z_convobj
+		ld bc,tab.convobj.1pt
+gen.zfake.loop
+		ld a,(bc):cp -1:jr nz,gen.zfake.loop_do ; still a convobj to analyze
+			; ends list
+			ld a,-1:ld (de),a
+			ret
+gen.zfake.loop_do
+			xor a:ld (de),a:inc de:inc de:inc de
+			inc bc		
+			jr gen.zfake.loop
+@rot.gen_all ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.sincos_rot_proj_sides_segs_z
+	call @rot.gen.sincos_rot_iso
+	call @scroller.proj_to_spr.wo_calc
+@rot.gen.sides_segs_z
+	call @rot.gen.sides_seen
+	call @rot.gen.segs_inked
+@rot.gen.z_convobj ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		ld de,tab.z_convobj
+		ld bc,tab.convobj.1pt
+gen.z_convobj.loop
+		ld a,(bc):cp -1:jr nz,gen.z_convobj.loop_do ; still a convobj to analyze
+			; ends list
+			ld a,-1:ld (de),a
+			ret
+gen.z_convobj.loop_do
+		exx
+		; 1pt exx / ld a,(bc)
+					ld l,a:ld h,0:ld de,hl:add hl,hl:add hl,de; *3
+					ex de,hl:
+@rot.adr.tab.pts equ $+1 :ld hl,0:add hl,de
+					ld a,(hl):ld (gen.z_convobj.x+1),a:inc hl ;x
+					ld a,(hl):ld (gen.z_convobj.y+1),a:inc hl ;y
+					ld a,(hl)  				                  ;z
+zz				    ld bc,0:call @sys.mul.8sx16s:push hl
+gen.z_convobj.x		ld a,0
+zx					ld bc,0:call @sys.mul.8sx16s:push hl
+gen.z_convobj.y		ld a,0
+zy					ld bc,0:call @sys.mul.8sx16s
+				pop bc:add hl,bc:pop bc:add hl,bc
+			ld bc,#8000:add hl,bc ; no neg
+				xor a :exx:ld (de),a:inc de:exx
+				ld a,l:exx:ld (de),a:inc de:exx
+				ld a,h:exx:ld (de),a:inc de
+			inc bc		
+			jr gen.z_convobj.loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.draw_all
+@rot.draw.all_convobj
+		ld hl,#FF00:ld (scr.xminmax+1),hl:ld (scr.yminmax+1),hl
+		xor a:ld (first_convobj+1),a:
+		ld (@rot.draw_all.jr0+1),a
+@rot.adr_spr_fill equ $+1 : ld a,0:ld (@rot.draw_adr_spr1+1),a:ld (@rot.draw_adr_spr2+2),a:ld (@rot.draw_adr_spr3+1),a
+draw.all_convobj.once_again
+		ld hl,#FF00:exx ; number of current convobj to draw /current convobj tested /// H keeps = -1 if not draw
+		ld bc,#FFFF
+		ld hl,tab.z_convobj
+draw.all_convobj.loop
+			ld a,(hl):inc hl:cp -1:jp nz,draw.all_convobj.do ; no more convobj?
+				exx:ld a,h:cp #FF:jr nz,draw.all_convobj.still_convobj ; check if still convobj to draw
+					; end of all convobj to draw
+					ret	
+draw.all_convobj.still_convobj
+				add a,a:add a,h:ld h,a
+					add a,LOW tab.z_convobj:ld e,a:ld d,HIGH tab.z_convobj:jr nc,2+$+1:inc d:ld a,1:ld (de),a
+				ld a,h:add a,LOW tab.adr_convobj:ld l,a:ld h,HIGH tab.adr_convobj:jr nc,2+$+1:inc h
+				ld a,(hl):add a,a:ld (convobj.flag_trans+1),a ; +2 on fill.tab...
+				inc hl:ld e,(hl):inc hl:ld d,(hl)
+					call rot.draw.segs_convobj
+;;; break
+					call @rot.fill;_fullspr
+@rot.draw_all.jr0		jr $+2
+						ld a,4:ld (first_convobj+1),a
+@rot.adr_spr_draw equ $+1 : ld a,0:ld (@rot.draw_adr_spr1+1),a:ld (@rot.draw_adr_spr2+2),a:ld (@rot.draw_adr_spr3+1),a
+ 						ld a,@rot.draw_all.jr1-(@rot.draw_all.jr0+2):ld (@rot.draw_all.jr0+1),a
+@rot.draw_all.jr1					
+						ld hl,(convobj.xminmax+1):ld b,h:ld d,l
+						ld hl,(convobj.yminmax+1):ld c,h:ld e,l
+scr.xminmax				ld hl,0
+							ld a,b:sub h:jr nc,2+$+1:ld h,b ; xmin = h 
+							ld a,l:sub d:jr nc,2+$+1:ld l,d ; xmax = l
+						ld (scr.xminmax+1),hl
+scr.yminmax				ld hl,0
+							ld a,c:sub h:jr nc,2+$+1:ld h,c ; ymin = h 
+							ld a,l:sub e:jr nc,2+$+1:ld l,e ; ymax = l
+						ld (scr.yminmax+1),hl
+					jp draw.all_convobj.once_again
+draw.all_convobj.do
+			or a:jr z,draw.all_convobj.do.not_done_yet ; if not 0, already draw
+			inc hl:inc hl:exx:inc l:exx:jp draw.all_convobj.loop 
+draw.all_convobj.do.not_done_yet
+			ld e,(hl):inc hl:ld d,(hl):inc hl:ex de,hl
+				xor a:push hl:sbc hl,bc:pop hl:ex de,hl
+				jr nc,draw.all_convobj.still_in_front		
+				; set new convobj in front
+					exx:ld h,l:inc l:exx:ld bc,de
+					jp draw.all_convobj.loop
+draw.all_convobj.still_in_front
+				exx:inc l:exx:jp draw.all_convobj.loop 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; DRAW & FILL
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.draw_line
+	 	; draw a line from (X0,Y0) to (X1,Y1)
+		; (X0,Y0) = (b,c)
+		; (X1,Y1) = (d,e)
+		; pen     =   a
+		call setpen_mode1
+		call different_cases
+calc_then_jp_fix
+		jp calc_then_jp
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+different_cases
+			ld a,e:sub c					; up or down? y++ or y--?
+			jr z,samey						; an horizontal line should not be draw
+			jr c,ydec
+			ld e,a							; e = DY
+			ld a,d:sub b					; right or left? x++ or x--?
+			jr z,samex						; case x0=x1
+			jr c,yinc_xdec
+			ld d,a:sub e					; d = DX	
+			jr nc,xinc_yinc					; |DX|>|DY|?
+yinc_xinc	ld a,e:srl a:sub e:ex af,af'	; DDX = 
+			ld a,4							; to calculate then where to jump (different cases)
+			ret
+ydec		ld a,b:ld b,d:ld d,a:ld a,e:ld e,c:ld c,a ; first, exchange bc <-> de == (x0,y0) <-> (x1,y1)
+			ld a,e:sub c:ld e,a				; e = DY	
+			ld a,d:sub b					; right or left? x++ or x--?
+			jr z,samex 						; case x0=x1
+			jr c,yinc_xdec
+			ld d,a:sub e					; d = DX
+			jr nc,xinc_yinc 				; |DX|>|DY|?
+			jr yinc_xinc					
+samey		pop hl							; horizontal lines are not put
+			ret								; /!\ warning about that strange end of call
+xinc_yinc	ld a,d:srl a:sub d:ex af,af'	; DDY = 
+			ld a,0							; to calculate then where to jump (different cases)
+			ret
+samex										; DDX = 
+			ld a,8							; to calculate then where to jump (different cases)
+			ret
+yinc_xdec	neg								; must work with positive number, also for DX
+			ld d,a:sub e					; d = DX
+			jr nc,xdec_yinc					; |DX|>|DY|?										
+			ld a,e:srl a:sub e:ex af,af'	; DDX = 
+			ld a,12							; to calculate then where to jump (different cases)
+			ret
+xdec_yinc	ld a,d:srl a:sub d:ex af,af'	; DDY = 
+			ld a,16							; to calculate then where to jump (different cases)
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+calc_then_jp	ld (calc_then_jp_addcase+1),a			; a' = prepared for drawing
+				; calculates adress within sprite
+height_spr_mod1		ld a,#80-1:sub c
+					;ld h,high @sys.tab.shift:ld l,a:ld a,(hl):inc h:ld c,(hl)
+					; c'est une multiplication par la largeur de l'écran, en octet: résultat = HI -> c , LO -> a
+@rot.shift_for_width1 	ld l,2:ld c,a:xor a:srl c:rra:dec l:jr nz,$-4				
+					ld l,a
+draw_adr_spr1		ld a,0;HIGH adr_spr
+					add a,c:ld h,a
+					ld a,b:srl a:srl a:add a,l:ld l,a	; output: hl is adress
+				; calcultates where to jump == which pixel wihtin the byte
+					ld a,b:exx:and 11b					; 4 pixels in mode 1
+calc_then_jp_addcase add a,0							; saved case (multiple of 4)
+					add a,a:ld hl,tbl_jp:add a,l:ld l,a
+					jr nc,2+$+1:inc h
+					; assert...
+					ld a,(hl):inc hl:ld h,(hl):ld l,a	; hl = the final jump in the unrolled loops
+					ld (calc_then_jp_where_to_jump+1),hl
+				;
+					exx:ex af,af:ld b,e
+					ld (backup_sp+1),sp					; stack depending of the width
+width_spr_sp		ld sp,#FFC0 ; #FFC0 or ##FFE0
+calc_then_jp_where_to_jump	jp 0						; as a call but without using stack
+endret
+backup_sp		ld sp,0
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tbl_jp		defw xinc_yinc_1000b_jp,xinc_yinc_0100b_jp,xinc_yinc_0010b_jp,xinc_yinc_0001b_jp 
+			defw yinc_xinc_1000b_jp,yinc_xinc_0100b_jp,yinc_xinc_0010b_jp,yinc_xinc_0001b_jp 
+			defw samex_1000b_jp,samex_0100b_jp,samex_0010b_jp,samex_0001b_jp
+			defw yinc_xdec_1000b_jp,yinc_xdec_0100b_jp,yinc_xdec_0010b_jp,yinc_xdec_0001b_jp 
+			defw xdec_yinc_1000b_jp,xdec_yinc_0100b_jp,xdec_yinc_0010b_jp,xdec_yinc_0001b_jp 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+setpen_mode1						; pen A (mode 1)
+		bit 0,a
+		jr nz,setpen_mode1_bit0
+		bit 1,a
+		jr nz,setpen_mode1_pen1
+		ld ix,0
+		ld iy,0
+		ret
+setpen_mode1_pen1
+		ld ix,1000000001000000b
+		ld iy,0010000000010000b
+		ret
+setpen_mode1_bit0
+		bit 1,a
+		jr nz,setpen_mode1_pen3
+		ld ix,0000100000000100b
+		ld iy,0000001000000001b
+		ret
+setpen_mode1_pen3
+		ld ix,1000100001000100b
+		ld iy,0010001000010001b
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	macro retjp
+		jp endret
+	endm
+	macro incy
+		add hl,sp
+	endm
+	macro incx
+		inc l ; inc l
+	endm
+	macro decx
+		dec l ; dec l
+	endm
+	macro plot0001b
+		ex af,af:ld a,iyl:xor (hl):ld (hl),a:ex af,af'
+	endm
+	macro plot0010b
+		ex af,af:ld a,iyh:xor (hl):ld (hl),a:ex af,af'
+	endm
+	macro plot0100b
+		ex af,af:ld a,ixl:xor (hl):ld (hl),a:ex af,af'
+	endm
+	macro plot1000b
+		ex af,af:ld a,ixh:xor (hl):ld (hl),a:ex af,af'
+	endm
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; |DX|>|DY|   DY>0   DX<0   X-- each loop   Y++ if needed
+xdec_yinc_0001b_loop	decx						; X-- after 4th pixel
+xdec_yinc_0001b_jp		add a,e						; DDY =+ DY
+						jr nc,xdec_yinc_0010b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0001b					; PLOT 0001b
+						incy						; Y++
+						djnz xdec_yinc_0010b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xdec_yinc_0010b_jp
+xdec_yinc_0010b_loop	add a,e						; DDY =+ DY
+						jr nc,xdec_yinc_0100b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0010b					; PLOT 0010b
+						incy						; Y++
+						djnz xdec_yinc_0100b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xdec_yinc_0100b_jp
+xdec_yinc_0100b_loop	add a,e						; DDY =+ DY
+						jr nc,xdec_yinc_1000b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0100b					; PLOT 0100b
+						incy						; Y++
+						djnz xdec_yinc_1000b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xdec_yinc_1000b_jp
+xdec_yinc_1000b_loop	add a,e						; DDY =+ DY
+						jr nc,xdec_yinc_0001b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot1000b					; PLOT 1000b
+						incy						; Y++
+						djnz xdec_yinc_0001b_loop	; DJNZ counts DY
+						retjp						; "RET"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; |DY|>|DX|   DY>0   DX<0   Y++ each loop   X-- if needed
+yinc_xdec_0001b_same_x	incy						; Y++
+yinc_xdec_0001b_jp 		plot0001b					; PLOT 0001b
+						djnz yinc_xdec_0001b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xdec_0001b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xdec_0001b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xdec_0010b_same_x	incy						; Y++
+yinc_xdec_0010b_jp 		plot0010b					; PLOT 0010b
+						djnz yinc_xdec_0010b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xdec_0010b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xdec_0010b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xdec_0100b_same_x	incy						; Y++
+yinc_xdec_0100b_jp 		plot0100b					; PLOT 0100b
+						djnz yinc_xdec_0100b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xdec_0100b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xdec_0100b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xdec_1000b_same_x	incy						; Y++
+yinc_xdec_1000b_jp 		plot1000b					; PLOT 1000b
+						djnz yinc_xdec_1000b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xdec_1000b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xdec_1000b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+						decx						; X-- after 4th pixel
+						jr yinc_xdec_0001b_same_x
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DX=0   Y++ each loop
+samex_0001b_jp			ld c,iyl:jr samex_everybody_loop
+samex_0010b_jp			ld c,iyh:jr samex_everybody_loop
+samex_0100b_jp			ld c,ixl:jr samex_everybody_loop
+samex_1000b_jp			ld c,ixh
+samex_everybody_loop	ld a,c:xor (hl):ld (hl),a	; plot ???? with c the good byte
+						incy						; Y++
+						djnz samex_everybody_loop	; DJNZ counts DY
+						retjp 						; "RET"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; |DY|>|DX|   DY>0   DX>0   Y++ each loop   X++ if needed
+yinc_xinc_1000b_same_x 	incy						; Y++
+yinc_xinc_1000b_jp		plot1000b					; PLOT 1000b
+						djnz yinc_xinc_1000b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xinc_1000b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xinc_1000b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xinc_0100b_same_x 	incy						; Y++
+yinc_xinc_0100b_jp		plot0100b					; PLOT 0100b
+						djnz yinc_xinc_0100b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xinc_0100b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xinc_0100b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xinc_0010b_same_x 	incy						; Y++
+yinc_xinc_0010b_jp		plot0010b					; PLOT 0010b
+						djnz yinc_xinc_0010b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xinc_0010b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xinc_0010b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+yinc_xinc_0001b_same_x 	incy						; Y++
+yinc_xinc_0001b_jp		plot0001b					; PLOT 0001b
+						djnz yinc_xinc_0001b_loop	; DJNZ counts DY
+						retjp						; "RET"
+yinc_xinc_0001b_loop	add a,d						; DDX =+ DX
+						jr nc,yinc_xinc_0001b_same_x; IF DDX<0 THEN... (X kept)
+						sub e						; DDX =- DY
+						incx						; X++ after 4th pixel
+						jr yinc_xinc_1000b_same_x
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; |DX|>|DY|   DY>0   DX>0   X++ each loop   Y++ if needed
+xinc_yinc_1000b_loop	incx						; X++ after 4th pixel
+xinc_yinc_1000b_jp		add a,e						; DDY =+ DY
+						jr nc,xinc_yinc_0100b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot1000b					; PLOT 1000b
+						incy						; Y++							
+						djnz xinc_yinc_0100b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xinc_yinc_0100b_loop
+xinc_yinc_0100b_jp		add a,e						; DDY =+ DY
+						jr nc,xinc_yinc_0010b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0100b					; PLOT 0100b
+						incy						; Y++							
+						djnz xinc_yinc_0010b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xinc_yinc_0010b_loop
+xinc_yinc_0010b_jp		add a,e						; DDY =+ DY
+						jr nc,xinc_yinc_0001b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0010b					; PLOT 0010b
+						incy					; Y++							
+						djnz xinc_yinc_0001b_loop	; DJNZ counts DY
+						retjp						; "RET"
+xinc_yinc_0001b_loop
+xinc_yinc_0001b_jp		add a,e						; DDY =+ DY
+						jr nc,xinc_yinc_1000b_loop	; IF DDY<0 THEN
+						sub d						; DDY =- DX
+						plot0001b					; PLOT 0001b
+						incy						; Y++							
+						djnz xinc_yinc_1000b_loop	; DJNZ counts DY
+						retjp						; "RET"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@rot.gen.trans_ink_d_eq_b
+		ld d,b
+@rot.gen.trans_ink 	; input = b,c,d as pen 1,2,3
+		ld hl,tab.trans_ink
+		call gen.trans_ink.do
+		ld hl,%0001000111101110
+		ld a,b:rlca:and l:ld e,a:ld a,b:rrca:rrca:rrca:and h:or e:ld b,a
+		ld a,c:rlca:and l:ld e,a:ld a,c:rrca:rrca:rrca:and h:or e:ld c,a
+		ld a,d:rlca:and l:ld e,a:ld a,d:rrca:rrca:rrca:and h:or e:ld d,a
+		ld hl,rot.tab.trans_ink+#100
+gen.trans_ink.do
+		ld ixh,0
+		ld iyh,-1
+gen.trans_ink.loop2	ld ixl,0
+				ld iyl,-1
+gen.trans_ink.loop1		ld a,ixl:and iyh:and c:     ld e,a ; 01 lolo and neg(hihi)
+					ld a,iyl:and ixh:and b:or e:ld e,a ; 10 neg(lolol) and hihi
+					ld a,ixl:and ixh:and d:or e        ; 11 lolo and hihi
+					ld (hl),a:inc l
+					ld e,17
+					ld a,ixl:add a,e:ld ixl,a
+					ld a,iyl:sub e  :ld iyl,a
+				ld a,l:and %1111:jr nz,gen.trans_ink.loop1
+				ld a,ixh:add a,e:ld ixh,a
+				ld a,iyh:sub e  :ld iyh,a
+			ld a,l:or a:jr nz,gen.trans_ink.loop2
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+fill.tab_noroll	defw rolled.fill.0m0t
+				defw rolled.fill.0m1t
+				defw rolled.fill.1m0t
+				defw rolled.fill.1m1t
+@rot.fill
+			ld a,(@rot.convobj.xminmax+1):or a:ret z ; nothing_to_do
+fill.adr_tab
+			ld hl,fill.tab_noroll
+first_convobj
+			ld a,0
+			if debug.convex_merge
+				sub 4:add a,4:jr c,2+$+2:break
+			endif
+convobj.flag_trans
+			add a,0
+			add a,l:ld l,a:jr nc,2+$+1:inc h
+			ld a,(hl):inc hl:ld h,(hl):ld l,a ; unrolled.fill.0m0t or so...
+			ld (fill.call1+1),hl
+			ld hl,(@rot.convobj.xminmax+1) ; H min /// L max
+			ld a,h:srl a:srl a:ld (fill.add_x2+1),a ;ld (fill.add_x1+1),a:  ; add x to spr and scr
+			srl l:srl l:sub l
+			ld d,a
+convobj.added_width add a,#40:ld (fill.add_spr+1),a
+			ld a,1:sub d
+			ld ixh,a; ixh = width
+			;
+			ld d,HIGH tab.xor_fill
+adr.tab.trans_ink			
+			ld e,HIGH tab.trans_ink
+			ld h,d
+			ld l,0
+			exx
+			ld hl,(@rot.convobj.yminmax+1) ; H min /// L max
+height_spr_mod4		ld a,#80-1:sub h:ld h,a
+height_spr_mod5		ld a,#80-1:sub l:ld l,h:ld h,a
+			ld a,l:sub h:inc a:ld ixl,a; screen height to fill = ixl
+			;ld l,h:ld h,high @sys.tab.shift:ld a,(hl):inc h:ld d,(hl)
+@rot.shift_for_width2 ld l,2:ld d,h:xor a:srl d:rra:dec l:jr nz,$-4 
+draw_adr_spr2 ld hl,0;rot.adr_spr	
+fill.add_x2	add a,0:ld e,a:add hl,de
+	ld a,l
+fill.bit_width	and #20
+	jr z,2+$+3:exx:inc e:exx
+	ld a,(@rot.dy_scr):and 1:jr z,2+$+6
+	exx:ld a,e:xor ((HIGH tab.trans_ink) xor ((HIGH tab.trans_ink)+1)):ld e,a:exx ; switch trans table
+
+			ld d,HIGH rot.tab.fill
+			ld c,0
+			;
+			ld a,l:exx:ld c,a:exx
+			ld a,h:exx
+draw_adr_spr3		sub 0;high rot.adr_spr
+					 ld b,a
+	 				ld a,(@rot.adr_spr_fill):add a,b:ld b,a:exx
+
+			jp fill.1st_loop
+fill.loop				ld a,l
+fill.add_spr			add a,0:ld l,a:jr nc,2+$+1:inc h
+						exx
+							ld c,a:jr nc,2+$+1:inc b
+							ld a,e:xor ((HIGH tab.trans_ink) xor ((HIGH tab.trans_ink)+1)):ld e,a ; switch trans table
+							ld l,0 ; no xorfill at start of line
+						exx
+fill.1st_loop		ld b,ixh
+fill.call1			jp 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+roll.fill.0m0t		; in-place!
+			inc l ; inc l...
+rolled.fill.0m0t
+			ld e,(hl) ; byte to fill
+			ld a,(de) ; filled byte (not translated yet)
+				exx
+		        xor (hl):ld l,a ; D = HIGH xorfill
+				;ld (bc),a:inc c ; scr inc c...
+				exx
+			ld (hl),a 
+			;ld (hl),c ; assuming C=0 empties buffer 
+roll.fill.0m0t.ends
+	djnz roll.fill.0m0t:dec ixl:jp nz,fill.loop:ret
+roll.fill.0m0t.ends_times
+	ld a,l:sub 0:add a,b
+	dec ixl:jp nz,fill.loop+1:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; roll.fill.0m1t.gameboy
+; 			ld a,ixy
+; 			sub 50
+; 			jr c,roll.fill.0m0t
+roll.fill.0m1t		; in-place!		
+			inc l ; inc l...
+rolled.fill.0m1t
+			ld e,(hl) ; byte to fill
+			ld a,(de) ; filled byte (not translated yet)
+				exx
+				ld h,d:xor (hl):ld l,a ; D = HIGH xorfill
+				ld h,e:ld a,(hl) ; E = HIGH translation to ditherer-colors
+				;ld (bc),a:inc c ; scr inc c...
+				exx
+			ld (hl),a 
+			;ld (hl),c ; assuming C=0 empties buffer 
+roll.fill.0m1t.ends
+	djnz roll.fill.0m1t:dec ixl:jp nz,fill.loop:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+roll.fill.1m1t		
+			inc l ; inc l...
+rolled.fill.1m1t
+			ld e,(hl) ; byte to fill
+			ld a,(de) ; filled byte (not translated yet)
+				exx
+				ld h,d:xor (hl):ld l,a ; D = HIGH xorfill
+				ld a,(bc) ; scr
+				inc h:and (hl) ; mask table is HIGH+1 xorfill
+				ld h,e:or (hl) ; E = HIGH translation to dithered-colors
+				ld (bc),a:inc c ; scr inc c...
+				exx
+			ld (hl),c ; assuming C=0 empties buffer 
+roll.fill.1m1t.ends
+	djnz roll.fill.1m1t:dec ixl:jp nz,fill.loop:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+roll.fill.1m0t		
+			inc l ; inc l...
+rolled.fill.1m0t
+			ld e,(hl) ; byte to fill
+			ld a,(de) ; filled byte (not translated yet)
+				exx
+				ld h,d:xor (hl):ld l,a ; D = HIGH xorfill
+				ld a,(bc) ; scr
+				inc h:and (hl) ; mask table is HIGH+1 xorfill
+				or l
+				ld (bc),a:inc c ; scr inc c...
+				exx
+			ld (hl),c ; assuming C=0 empties buffer 
+roll.fill.1m0t.ends
+	djnz roll.fill.1m0t:dec ixl:jp nz,fill.loop:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	endmodule
+
+	
+	

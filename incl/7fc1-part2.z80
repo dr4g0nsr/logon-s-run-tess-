@@ -1,0 +1,517 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	LET IT BIG AFTER  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+inter.ends_but_do_logo
+				ld (inter.which_int+1),bc	
+				push hl
+ 					ld hl,inter.ends:ld (inter.line_26_2.gameboy_logo_fix+1),hl
+ 					ld bc,#7FC1:out (c),c
+ 					call letitbig.after.spr_gen		
+	 				ld a,(sys.7FC1_3):ld b,#7F:out (c),a
+ 				pop hl
+ 			pop bc,af
+ 		ret	 			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.after.backup_background
+			ld a,#C1:call sys.set_7FCx
+				ld de,letitbig.after.backup_bg_temp
+				ld hl,#1151
+				ld ixh,69
+				call letitbig.after.backup_background.loop0
+			jp sys.set_7FC2
+letitbig.after.backup_background.loop0
+				push hl:ld bc,22:ldir:pop hl
+				call letitbig.misc.next_scanline
+				dec ixh:jr nz,letitbig.after.backup_background.loop0
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.mod_barlines
+			call sys.7FC1_3.backup
+			ld a,#C1:call sys.set_7FCx
+				ld hl,#39E3:				call letitbig.mod_barline
+				ld hl,#39E3-#3800+#40:		call letitbig.mod_barline
+				ld hl,#39E3-#3800+#40*4+2:	call letitbig.mod_barline
+			call sys.set_7FC2
+			jp sys.7FC1_3.restore
+letitbig.mod_barline
+				ld de,hl:call letitbig.misc.next_scanline:ex de,hl
+				ld a,(de):xor 	%1110	:ld (de),a
+				ld ixh,15
+				jr letitbig.mod_barline_1st
+letitbig.mod_barline.loop
+				ld a,(hl):xor 	%0111	:ld (hl),a
+				ld a,(de):xor 	%1000	:ld (de),a
+				dec ixh:ret z
+				call letitbig.misc.next_scanline_decle:ex de,hl:call letitbig.misc.next_scanline_decle:ex de,hl
+				ld a,(hl):xor 	%0011	:ld (hl),a
+				ld a,(de):xor 	%1100	:ld (de),a
+				dec ixh:ret z
+				call letitbig.misc.next_scanline_decle:ex de,hl:call letitbig.misc.next_scanline_decle:ex de,hl
+				ld a,(hl):xor 	%0001	:ld (hl),a
+				ld a,(de):xor 	%1110	:ld (de),a
+				dec ixh:ret z
+letitbig.mod_barline_1st
+				call letitbig.misc.next_scanline_decle:call letitbig.misc.next_scanline:ex de,hl
+				call letitbig.misc.next_scanline_decle:call letitbig.misc.next_scanline:ex de,hl
+			jr letitbig.mod_barline.loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.mod_led.on_off
+		ld a,#C1:call sys.set_7FCx
+			ld hl,#1A51:ld a,(hl):xor #10 xor #5A:ld (hl),a
+			ld hl,#2251:ld a,(hl):xor #01 xor #A5:ld (hl),a
+			ld hl,#2A51:ld a,(hl):xor #10 xor #5A:ld (hl),a
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.misc.next_scanline_decle
+			dec l
+letitbig.misc.next_scanline
+			ld a,h:add a,8:ld h,a:bit 6,h:ret z
+			sub 8*8:ld h,a:ld a,l:add a,64:ld l,a:ret nc
+			inc h:ret
+letitbig.misc.next_scanline_bc
+			ld a,b:add a,8:ld b,a:bit 6,b:ret z
+			sub 8*8:ld b,a:ld a,c:add a,64:ld c,a:ret nc
+			inc b:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.put_bg_col ; utilisé aussi en letitbig after!!!
+				ld bc,#7FC3:out (c),c ; /!\ pas sous INT
+				ld hl,(deulignes.put_bg_col.adr_vram+1)				
+				ld a,h
+				ld c,8
+deulignes.put_bg_col.fix1
+				ld ixh,34/2				
+deulignes.put_bg_col.loop0
+					call deulignes.put_bg_doublechar
+					dec ixh:jr nz,deulignes.put_bg_col.loop0
+				ld bc,#7FC2:out (c),c ; /!\ pas sous INT
+deulignes.put_bg_col.adr_vram
+deulignes.put_bg_col.fix2
+				ld hl,#8000+(51-1)*2
+				inc l:inc hl:ld (deulignes.put_bg_col.adr_vram+1),hl 				
+			ret	
+deulignes.put_bg_doublechar
+deulignes.put_bg_char1
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:call deulignes.put_bg.next_charline ; + 2 bytes
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l:ld h,a
+					ld (hl),0:inc l:add a,c:ld (hl),0:dec l
+deulignes.put_bg.next_charline
+					sub 64:ld h,a
+					ld a,l
+deulignes.put_bg.next_charline.fix1
+					add a,51*2:ld l,a:ld a,h:ret nc
+					inc a:inc h:and %111:ld a,h:ret nz
+					and %111
+deulignes.put_bg.next_charline.fix2
+					or #40:ld h,a:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	LET IT BIG!  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dollar.final.delete_from_here
+
+dollar.letitbig_7FC1
+letitbig.int_7FC1		push af,bc:ld bc,#7FC2:out (c),c
+						jp letitbig.int
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.int_7FC1_ret
+letitbig.call_buttons		call letitbig.upd_raster_buttons_7FC1
+letitbig.call_shift_7FC1	call letitbig.loop_shift_x.call_7FC1
+						ld a,(sys.7FC1_3):ld b,#7F:out (c),a
+					pop iy,ix,hl,de,bc,af:exx:ex af,af:pop hl,de,bc,af
+				ei
+			ret			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.upd_raster_buttons_7FC1
+			ld a,#38
+			ld hl,letitbig.shift_y+1:add (hl)
+			ld bc,#7FC3:out (c),c  ; /!\ sous INT
+			ld hl,letitbig.eat1stlines_nb+1:sub (hl)
+letitbig.upd_raster_buttons.hl_backup
+ if cond.colorz=1
+ ld hl,letitbig.rasters-#8000+#F0:ld (hl),1:inc l:ld (hl),1
+ else
+			ld hl,letitbig.rasters-#8000+#F0:ld (hl),0:inc l:ld (hl),0
+ endif
+			ld l,a
+letitbig.upd_raster_buttons.hl_nook
+			ld a,(hl):inc l:or (hl):inc l:or (hl):
+ if cond.colorz=1
+ cp 1
+ endif
+												  jr z,letitbig.upd_raster_buttons.hl_ok
+				dec l:jr letitbig.upd_raster_buttons.hl_nook
+letitbig.upd_raster_buttons.hl_ok
+			dec l:ld (hl),#5C:dec l
+ if cond.colorz=1	
+ ld (hl),#10
+ else
+									ld (hl),#03
+ endif
+			ld a,l:ld (letitbig.upd_raster_buttons.hl_backup+1),a
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.loop_shift_x.call_7FC1
+							ld hl,letitbig.precalc.ldhl
+				 			ld bc,#7FC3:out (c),c ; /!\ sous INT
+				 			push hl:ld (hl),#C9
+letitbig.loop_shift_x1			ld hl,#4000
+								ld de,#F000
+								ld c,#A0
+letitbig.loop_shift_x_call1		call letitbig.precalc.ldhl
+letitbig.loop_shift_x2			ld hl,#4800
+								ld c,#50
+letitbig.loop_shift_x_call2		call letitbig.precalc.ldhl
+							pop hl:ld (hl),#2C							
+							ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.decrunch.copybuffer_7FC1
+			ld a,(letitbig.store_sp.tab_bank):ld h,a:ld l,#02;ld hl,#4002
+			ld a,(letitbig.store_sp.tab_bank+2);ld a,#C1
+			call sys.set_7FCx
+			ld de,letitbig.mod.buffer_sp
+			ld bc,#880-2
+			ldir
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.ymod.call_7FC1
+letitbig.mod.set_7FCx	
+		ld a,0:call sys.set_7FCx
+		ld ixh,high letitbig.mod.unroll	
+		ld iyh,high letitbig.mod.unroll	
+letitbig.mod.set_HL		
+		ld hl,0
+		exx
+		ld hl,letitbig.mod.unroll_ret2	
+		ld de,letitbig.mod.unroll_ret1
+letitbig.mod.unroll_ret2
+letitbig.ymod.subcall.loop0
+		exx	
+		ld d,high letitbig.mod.tab_l0l1jr
+		ld e,(hl):inc l
+		ld a,(hl):inc hl
+		cp low letitbig.scanline0_blk:jr nz,letitbig.ymod.subcall.not_blank_lines
+		ld a,e:cp -1:jr nz,letitbig.ymod.subcall.loop0+3
+		jp sys.set_7FC2
+letitbig.ymod.subcall.not_blank_lines
+		ld c,a
+		ld a,(de):ld ixl,a
+		ld e,c
+		ld a,(de):ld iyl,a
+letitbig.ymod.adr_tab_conv
+		ld d,high letitbig.mod.tab_conv
+		jp (ix)
+letitbig.mod.unroll_ret1
+		exx
+		jp (iy)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.eat1stlines_7FC1	; in #7FC2
+							ld (letitbig.eat1stlines.backup_sp+1),sp
+							ld sp,(letitbig.loop_sp+1)
+							ld de,(letitbig.loop_bank+1)
+							;
+letitbig.eat1stlines_bank	ld bc,#7F00:out (c),c ; /!\ sous INT
+letitbig.eat1stlines_sp		ld hl,0
+						; vérifier s'il y a des lignes à (encore) sauter
+							ld c,(hl):inc l:ld a,(hl)
+							cp 5:jr nz,letitbig.eat1stlines_7FC1.blanklines_ok
+						; la 1ère commande de saut de ligne est à supprimer
+							pop hl ; dummy
+						; y'a des lignes à sauter, faut en modifier le nb
+							ld a,(letitbig.eat1stlines_nb+1):ld b,a:ld a,c:sub b
+							jr nc,letitbig.eat1stlines_7FC1.still_blanklines
+letitbig.eat1stlines_7FC1.no_blankline
+						; pas de blankline, donc c=1 (utile si JR Z de suite)
+							ld a,1
+						; cas où nb de lignes à sauter = le nb qu'on sautait justement :)
+							jr z,letitbig.eat1stlines_7FC1.ends
+						; ajustement du nb de loop
+							ld a,b:sub c:jr letitbig.eat1stlines_nb+2
+letitbig.eat1stlines_7FC1.blanklines_ok
+letitbig.eat1stlines_nb		ld a,0
+						; ici dans A le nb de loops
+							dec a:ld l,a:ld a,#FF:sub l:ld l,a:ld h,high letitbig.rasters	; HL pour les rasters tous les 2 scanlines
+							exx
+						; avant le call
+							ld de,#100*(high letitbig.adr_vram)+(high (letitbig.adr_vram+#800))						
+							ld a,high letitbig.eat1stlines.code	; poids forts des jumps
+							ld ixh,a							; poids forts des jumps
+							exx
+							ld b,#7F
+							jp letitbig.eat1stlines.code
+letitbig.eat1stlines.post_ret
+						; pas de blankline à sauter
+							xor a
+letitbig.eat1stlines_7FC1.still_blanklines 
+						; toujours des lignes à sauter, tant mieux
+letitbig.eat1stlines_7FC1.ends ; requires: A++ to (letitbig.shift_y+1)
+							ld bc,#7FC2:out (c),c
+							inc a:ld (letitbig.shift_y+1),a
+							ld (letitbig.loop_sp+1),sp
+letitbig.eat1stlines.backup_sp	
+							ld sp,0
+						ret									
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.decrunch.toscreen.part_23
+			ld a,#C1:call sys.set_7FCx
+			call letitbig.decrunch.toscreen.11_charlines
+			call sys.set_7FC2
+			ld hl,#C000-1:ld de,#D600-1:ld bc,#1400:lddr
+			ld a,#C1:call sys.set_7FCx
+			ld b,10:call letitbig.decrunch.toscreen.n_charlines
+			call sys.set_7FC2
+			ld hl,#C000-#1400-1:ld de,#D600-1:ld bc,7*#0200:lddr
+		ret
+letitbig.decrunch.toscreen.part_1
+			ld a,#C1:call sys.set_7FCx
+			ld hl,#4000-1-64*(11+10):ld (letitbig.decrunch.toscreen.n_charlines+1),hl
+			ld b,7:call letitbig.decrunch.toscreen.n_charlines
+			call sys.set_7FC2
+			ld hl,#C000-#1400-1-7*#200:ld de,#D600-1:ld bc,4*#0200:lddr
+			ld a,#C1:call sys.set_7FCx
+			ld b,4:call letitbig.decrunch.toscreen.n_charlines
+		jp sys.set_7FC2		
+letitbig.decrunch.toscreen.11_charlines
+			ld b,11
+letitbig.decrunch.toscreen.n_charlines ; #200 for 1 charline
+			ld de,#4000-1
+			ld hl,#D600-1
+letitbig.decrunch.toscreen.loop_n_charlines
+			push bc				
+				ld a,8
+letitbig.decrunch.toscreen.loop_charline
+					ld bc,64:lddr
+					ex de,hl:ld bc,#F800+64:add hl,bc:ex de,hl
+					dec a:jr nz,letitbig.decrunch.toscreen.loop_charline
+				ex de,hl:ld bc,#4000-64:add hl,bc:ex de,hl
+			pop bc
+			djnz letitbig.decrunch.toscreen.loop_n_charlines
+			ld (letitbig.decrunch.toscreen.n_charlines+1),de
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.switch_no_bottom_7FC1 ; /!\ hors sys 
+			ld bc,#7FC3:out (c),c
+			ld hl,#C29D:ld (letitbig.rasters-#8000+#83-letitbig.constant_r4mod-1),hl ; #7FC3
+			ld bc,#7FC2:out (c),c
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.init.7FC1
+		; copie le code en 2 fois
+			ld hl,letitbig.src_code:ld de,letitbig.code.copy_buffer:ld bc,letitbig.src_code_end-letitbig.src_code
+			push bc:push de
+				ldir
+				ld a,#C3:call sys.set_7FCx
+			pop hl:ld de,letitbig.code-#8000:pop bc
+			ld b,0:ldir
+			
+		; copie le code en 2 fois
+			call  sys.set_7FC2
+			ld hl,letitbig.eat1stlines.src_code:ld de,letitbig.code.copy_buffer:ld bc,letitbig.eat1stlines.src_code_end-letitbig.eat1stlines.src_code
+			push bc:push de
+				ldir
+				ld a,#C3:call sys.set_7FCx
+			pop hl:ld de,letitbig.eat1stlines.code-#8000:pop bc
+			ld b,0:ldir
+			
+		; temporaire table des rasters
+			ld hl,letitbig.rasters-#8000
+ if cond.colorz
+ ld a,1
+ else
+ 			xor a
+ endif
+			ld (hl),a:inc l:jr nz,$-2
+			ld l,#0A+1:ld (hl),RGB201
+			ld l,#20+1:ld (hl),RGB000
+			ld l,#36+1:ld (hl),RGB202
+			ld l,#4C+1:ld (hl),RGB000
+			ld l,#62+1:ld (hl),RGB002
+			ld l,#78+1  :ld (hl),RGB000
+			ld l,#78+1-4:ld (hl),#9D
+			ld l,#83:ld (hl),#C2
+			ld l,#FF:ld (hl),#C2 ; pour eat1stlines
+			
+		; temporaire: écran rempli de la trame
+			ld hl,letitbig.precalc.mask:ld de,letitbig.adr_vram-#8000:ld bc,96:ldir
+			ld hl,letitbig.precalc.mask+#100:ld de,letitbig.adr_vram+#800-#8000:ld bc,96:ldir
+
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	DEULIGNES / AFTER ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.script.update_scroller.crtc_16kb_fix
+			ld (scroller.crtc_16kb_fix+4),a
+			jp scroller.int1
+ if cond.colorz=1
+ else
+deulignes.script2.init
+			;
+			; engrenages
+			;
+			ld hl,48*11:ld (scroller.inc_split+1),hl ; okazou?
+			ld hl,48*4*7:ld (scroller.inc_scr+1),hl
+			ld a,#20:call deulignes.script.update_scroller.crtc_16kb_fix
+	  		ld de,deulignes.script3.init:ld bc,timing_engrenages:jp sys.put_call_at_VBL_wo_call 
+deulignes.script3.init
+			;
+			; engrenages / mario / rubber
+			;
+ 			ld hl,scroller.int2_fixed:ld (scroller.int2_fix+3),hl:ld hl,scroller.int3_fixed:ld (scroller.int3_fix+3),hl
+ 			ld hl,(scroller.int1+1):ld (scroller.int3_fixed.scr+1),hl
+ 			ld bc,48:add hl,bc:ld (scroller.int2_fixed.scr+1),hl
+			ld a,#20:call deulignes.script.update_scroller.crtc_16kb_fix ; engrenages
+	  		ld de,deulignes.script5.init:ld bc,timing_engrenages_mario_rubber:jp sys.put_call_at_VBL_wo_call 
+deulignes.script5.init
+deulignes.script7.init
+			;
+			; rubber / rubber / rubber
+			;
+ 			ld hl,scroller.int2:ld (scroller.int2_fix+3),hl:ld hl,scroller.int3:ld (scroller.int3_fix+3),hl
+ 			ld hl,(scroller.int3_fixed.scr+1):ld bc,2048-48*11*2:add hl,bc:ld (scroller.int1+1),hl
+			ld hl,1024-48*2:ld (scroller.inc_scr+1),hl
+			xor a:call deulignes.script.update_scroller.crtc_16kb_fix
+ 	  		ld de,deulignes.script91.init:ld bc,timing_rubber:jp sys.put_call_at_VBL_wo_call 
+; endif
+; if cond.colorz=1
+; else  
+deulignes.script91.init
+			;
+	  		; init sortie de deulignes
+	  		;
+	  		ld hl,deulignes.script91:ld de,deulignes.script91.ends:ld bc,64:jp sys.put_call_at_VBL
+ 			;
+	  		; sortie de deulignes
+	  		;
+deulignes.script91
+			ld bc,#7FC1:out (c),c ; /!\ not int compatible
+deulignes.script91.adr_scr
+			ld hl,#0000
+				; vide un demi-caractère de haut
+					ld de,64:ld b,32*4:xor a
+					ld (hl),a:add hl,de:djnz $-2
+			; considérer 1 ligne de caractère de 64 octets de large
+			ld a,#0:add a,23:and 63:ld ($-5),a:ld l,a 
+deulignes.script91_xor
+			ld a,#0:xor #20:ld ($-3),a:ld h,a ; on change de demi-ligne 1 fois sur 2
+			ld (deulignes.script91.adr_scr+1),hl
+			ld bc,#7FC2:out (c),c ; /!\ not int compatible
+			ret
+deulignes.script91.ends
+			ld a,#20:ld (deulignes.script91_xor+1),a
+	  		ld hl,deulignes.script91:ld de,deulignes.script91ter.ends:ld bc,65:jp sys.put_call_at_VBL
+ endif	  		
+deulignes.script91ter.ends
+ if cond.colorz=1
+deulignes.cond_colorz 
+ ld b,#F5:in a,(c):rra:jr nc,$-3:halt
+ endif 
+ 			;
+	  		; prépare écran pour letitibig
+	  		;
+			; palette
+			ld hl,sys.ink1val
+ if cond.colorz=1
+ ld (hl),#4B:inc hl 
+ else			
+	  		ld (hl),RGB000:inc hl ; pour le fond, simili-noir 
+ endif
+	  		ld (hl),RGB111:inc hl
+	  		ld (hl),RGB100 
+	  		ld a,RGB000:ld bc,#7F01:out (c),c:out (c),a ; pen 1 = black
+			ld bc,#BC06:out (c),c:ld bc,#BD0B:out (c),c ; pour éviter glitch 
+			; screen 32x32
+			halt
+			ld b,10:djnz $
+			ld bc,#BC00:out (c),c:	ld bc,#BD3F+8:out (c),c
+			ld b,#30/4-4*0:djnz $ ; 4 pour ligne préc.
+									ld bc,#BD3F:out(c),c ; reg0 décalé
+			ld bc,#BC02:out (c),c:	ld bc,#BD32-8:out (c),c
+			ld a,32:ld (sys.crtcreg1val+1),a ; inutile: ld a,32:call @rot.reset.scr_width ; 
+			ld hl,0:ld de,32*11:ld bc,#0000:call scroller.set_scr ; <- split 11 identique
+			;xor a:ld (scroller.crtc_16kb_fix+4),a ; pas de #C comme overscan
+			; empty/fill screen	  		
+			call sys.7FC1_3.backup
+			ld a,#C1:call sys.set_7FCx
+		  		ld hl,#0000:ld de,#0001:ld bc,#3FFF:ld (hl),%11110000:ldir ; fill w/ pen 1
+			call sys.7FC1_3.restore
+			ld bc,#7FC2:out (c),c
+			; interruption avec les rasters adéquats
+			ld hl,inter.line_06_6.gameboy:ld (inter.line_06_6.gameboy_fix+1),hl:ld a,l:ld (sys.wait_int_vbl_is_over_djnz+1),a
+			ld hl,inter.line_13_2.gameboy:ld (inter.line_13_2.gameboy_fix+1),hl
+			ld hl,inter.line_19_6.gameboy:ld (inter.line_19_6.gameboy_fix+1),hl
+			ld hl,inter.line_26_2.gameboy:ld (inter.line_26_2.gameboy_fix+1),hl
+			ld a,RGB002:ld (sys.ink0val),a ; sera la couleur (rasterisée) de la trame du fond
+ if cond.colorz=1
+ jp sys.zik_at_1
+ endif 
+	  		ld de,deulignes.transit1.init:ld bc,timing_transit0:jp sys.put_call_at_VBL_wo_call 
+deulignes.transit1.init			
+ 			;
+	  		; pose les carrés (tous en pen 0)
+	  		;
+	  		ld hl,deulignes.transit.int:ld de,deulignes.transit.int.ends:ld bc,timing_transit_freq_square*9+1:jp sys.put_call_at_VBL
+deulignes.transit.int
+			ld a,0
+			or a:jr z,deulignes.transit.int.action
+			dec a:ld (deulignes.transit.int+1),a:ret
+deulignes.transit.int.action
+			ld a,timing_transit_freq_square:ld (deulignes.transit.int+1),a
+deulignes.transit.call0
+			ld bc,#7FC1:out (c),c ; /!\ not int compliant
+deulignes.transit.call0.adr_data
+			ld hl,deulignes.transit.call0.data
+			ld c,(hl):inc hl:ld b,(hl):inc hl ; adresse
+			ld e,(hl):inc hl:ld d,(hl):inc hl ; remplissage
+			ld (deulignes.transit.call0.adr_data+1),hl
+			ld hl,bc
+			ld c,22
+deulignes.transit.loop0
+				ld b,11:ld (hl),d:inc l:djnz $-2:set 3,h
+				ld b,11:dec l:ld (hl),e:djnz $-2:res 3,h
+				ld a,h:add a,#10:bit 6,a:ld h,a:jr z,2+$+9
+					ld a,l:add a,64:ld l,a:jr nc,2+$+1:inc h:res 6,h
+				dec c:jr nz,deulignes.transit.loop0
+			ld bc,#7FC2:out (c),c ; /!\ not int compliant
+			ret
+deulignes.transit.call0.data
+			defw #00C4,#A050
+			defw #00DA,#0000
+			defw #00F0,#A050
+			defw #0384,#A050
+			defw #039A,#0000
+			defw #03B0,#A050
+			defw #0644,#A050
+			defw #065A,#0000
+			defw #0670,#A050
+deulignes.transit.int.ends	  		
+			ld hl,0:ld (scroller.inc_split+1),hl
+			call scroller.int1
+			jp sys.zik_at_1
+			
+
+
+			
+			

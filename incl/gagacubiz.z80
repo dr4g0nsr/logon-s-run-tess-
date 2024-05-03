@@ -1,0 +1,458 @@
+;gagacubiz_cube63
+;gagacubiz_cube18
+;gagacubiz_cube151
+;gagacubiz_cube271
+;splitz_cubiz
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+gagacubiz_cube18_display
+			ld a,#55:ld (sys.ink1val),a
+	  		ld a,#4C:ld (sys.ink2val),a
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.60n18
+		dw 120,1800,-18
+		db 1
+		dw 6
+		db 1,1
+		dw 14,3641
+scroller.60n63
+		dw 120,1799,-63
+		db 1
+		dw 25
+		db -1,2
+		dw 2,1040
+scroller.60n151
+		dw 120,839*2+1,-151
+		db 7
+		dw 55
+		db -1,4
+		dw 96,434
+scroller.60n271
+		dw 120,900*2,-271
+		db 0
+		dw 248
+		db 1,0
+		dw 0,242
+; scroller.60n433
+; 		dw 120,840*2,-433
+; 		db 7
+; 		dw 353
+; 		db 1,0
+; 		dw 160,151
+; scroller.60n827
+; 		dw 60*2,899*2+1,-827
+; 		db 0
+; 		dw 160
+; 		db -1,4
+; 		dw 224,79
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; cubes moyens monochromes
+gagacubiz_cube63
+; 			call gagacubiz_cube63.init_common		
+; gagacubiz_cube63.init_common		
+			ld hl,scroller.60n63:ld de,tab.pts.cube63:call scroller.init_then_rot.reset.pts_then_object
+			ld bc,%0101010111111111 	; 0303 | 3333
+			;ld d,b ; unused but may appear is side very thin
+				call @rot.gen.trans_ink_d_eq_b
+		; init
+			ld hl,#C000:ld bc,#10000-#10000/63:ld de,1:ld a,18:call scroller.init.sinus_dx
+			ld hl,#4000:ld bc,#10000-#10000/63:ld de,1:ld a,12:call scroller.init.sinus_dy
+			ld hl,#1100:ld (rot.ay_16bits),hl
+			ld hl,#E100:ld (rot.az_16bits),hl
+			ld hl,60:ld (rot.mulu),hl
+		;
+			call sprite.fix.andor.xor_screen
+		;
+			ld bc,63 ; nb of loops
+			ld hl,cube63.calc ; special call for updating parameters
+		jp scroller.direct_to_screen
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cube63.calc			
+cube63.calc.ax		ld hl,#8000
+						ld bc,#10000/63/2:add hl,bc:ld (cube63.calc.ax+1),hl
+						push hl							
+						call @sys.sinus_16bits
+						pop de
+						add hl,de
+						ld de,#1000:add hl,de
+						ld (rot.ax_16bits),hl
+					call scroller.calc.sinus_dx
+					jp scroller.calc.sinus_dy
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.cube63
+aaa=64
+;pts
+				defb  -aaa,-aaa,-aaa
+				defb  -aaa, aaa,-aaa
+				defb   aaa, aaa,-aaa
+				defb   aaa,-aaa,-aaa
+				defb  -aaa,-aaa, aaa
+				defb  -aaa, aaa, aaa
+				defb   aaa, aaa, aaa
+				defb   aaa,-aaa, aaa
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 1,0,3,2,#80+2			
+						defb 1,0,2,3,#80+3			
+					defb 7,4,5,6,#80+1
+						defb 7,4,6,5,#80+3
+;					defb 0,1,5,4,#80+1
+					defb 2,3,7,6,#80+1
+						defb 2,3,6,7,#80+3
+					defb 1,2,6,5,#80+2			
+						defb 1,2,5,6,#80+3			
+					defb 3,0,4,7,#80+2
+						defb 3,0,7,4,#80+3
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; gros cubes d'arrière plan en 2 couleurs tramées avec le fond
+gagacubiz_cube18
+;			call gagacubiz_cube18.init_common
+;gagacubiz_cube18.init_common		
+			ld hl,scroller.60n18:ld de,tab.pts.cube18:call scroller.init_then_rot.reset.pts_then_object
+			ld bc,%0101000000000101 	; 0101 | 0202   
+			;ld d,%01010000 	; unused but...
+				call @rot.gen.trans_ink_d_eq_b
+		; init
+			ld hl,#8400:ld bc,#10000-#10000/18:ld de,1:ld a,8::call scroller.init.sinus_dy
+			ld hl,#F000:ld (rot.ay_16bits),hl
+			ld hl,#800:ld (rot.az_16bits),hl
+			ld hl,135:ld (rot.mulu),hl
+		; to screen			
+	  		call @sprite.fix.andor.or_screen
+			ld bc,18 ; nb of loops
+			ld hl,cube18.calc ; special call for updating parameters
+				call scroller.direct_to_screen
+		; ends	  		
+	  	jp @sprite.fix.andor.normal	  	 	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cube18.calc
+					ld hl,0:ld (scroller.calc.dxraw),hl
+cube18.calc.ax		ld hl,#10000-2*#10000/18/4
+						ld bc,#10000/18/4:add hl,bc:ld (cube18.calc.ax+1),hl
+					ld (rot.ax_16bits),hl
+					jp scroller.calc.sinus_dy
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.cube18
+aaa=64
+aab=50
+aac=38
+;pts
+				; face de côté
+				defb -aaa,-aaa,-aaa
+				defb -aaa, 000,-aaa
+				defb -aaa, aaa,-aaa
+				defb -aaa,-aaa, 000
+				defb -aaa, 000, 000
+				defb -aaa, aaa, 000
+				defb -aaa,-aaa, aaa
+				defb -aaa, 000, aaa
+				defb -aaa, aaa, aaa
+				; face de dessous
+; 				defb -aaa,-aaa, aaa
+; 				defb -aaa, 000, aaa
+; 				defb -aaa, aaa, aaa
+				defb  000,-aaa, aaa
+				defb  000, 000, aaa
+				defb  000, aaa, aaa
+				defb  aaa,-aaa, aaa
+				defb  aaa, 000, aaa
+				defb  aaa, aaa, aaa
+				; face de dessous
+;				defb -aaa, aaa,-aaa
+;				defb -aaa, aaa, aaa
+;				defb  aaa, aaa, aaa
+				defb  aaa, aaa, 000
+				defb  aaa, aaa,-aaa
+				defb  000, aaa, aaa
+				defb  000, aaa, 000
+				defb  000, aaa,-aaa
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 4,0,1,4,2,5,4,8,7,4,6,3,4,#80+1
+					defb 4,1,2,4,5,8,4,7,6,4,3,0,4,#80+2
+					;
+					defb 10,9,6,7,10,13,14,11,10,#80+1
+					defb 10,7,8,11,10,9,12,13,10,#80+2
+					;
+					defb 18,19,16,15,18,17,8,5,18,#80+1
+					defb 18,5,2,19,18,15,14,17,18,#80+2
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; cubes anciennement ombrés
+gagacubiz_precalc1_common
+		; init
+			ld hl,scroller.60n151:call scroller.init
+				ld hl,offset_gagacubiz:ld (scroller.o),hl
+			;
+			ld hl,#0000:ld bc,#10000/151*2:ld de,1:ld a,22
+				call scroller.init.sinus_dx
+			ld hl,#0000:ld bc,#10000/151*2:ld de,1:ld a,22
+				call scroller.init.sinus_dy
+			ld hl,#0000:ld bc,#10000/151:ld de,#140
+				call @sys.calc.sinus3.init.shunt
+			ld hl,#C000:ld bc,#10000-#10000/151/2:ld de,1:ld a,25 ; ex 30
+				call @sys.calc.sinus4.init
+			;
+			ld hl,#1800:ld (rot.ay_16bits),hl
+			ld hl,#2000:ld (rot.az_16bits),hl
+			;
+			ld hl,tab.pts.cube151
+		jp  @rot.reset.pts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+gagacubiz_precalc1a
+			call gagacubiz_precalc1_common
+		; precalc
+			ld hl,cube151.calc ; special call for updating parameters
+			ld de,cube151.store_pts ; adr store pts precalc 
+			ld bc,151*1 ; nb of loops for precalc
+				call scroller.precalc
+;			ld a,#C9:ld (cube151.calc.mulu.fix),a
+; 				ld bc,151 ; nb of loops for precalc
+; 					call scroller.precalc.loop
+			ld hl,(rot.mulu):ld (gagacubiz_precalc1b_mulu+1),hl
+			ld hl,(scroller.precalc.store_adr+1):ld (gagacubiz_precalc1b_de+1),hl
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+gagacubiz_precalc1b
+			call gagacubiz_precalc1_common
+gagacubiz_precalc1b_mulu ld hl,0:ld (rot.mulu),hl
+gagacubiz_precalc1b_de	ld de,0
+			ld hl,cube151.calc_wo_mulu
+			ld bc,151 ; nb of loops for precalc
+		jp scroller.precalc;.loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+gagacubiz_cube151
+		; presegs
+			; /!\ pas d'affichage en //, il faut qu'il soit fini						
+			call sys.wait.no_call_at_VBL
+			ld hl,tab.pts.cube151
+				call @rot.reset.object
+			;ld b,%11110101 	; 1313   
+			;ld c,%10100101 	; 1212
+			ld bc,%1111010110100101
+			ld d,%11110000 	; 1111 
+				call @rot.gen.trans_ink
+			; precalc segs inked
+			ld hl,cube151.store_segs	; adr store segs inked
+			ld de,cube151.store_pts
+			ld bc,151*2	; nb of loops
+				call scroller.presegs
+		; to screen			
+			ld hl,inter.return:ld (sys.last_call_at_VBL+1),hl 
+			ld bc,151*2
+			ld de,cube151.store_pts
+			ld hl,cube151.store_segs	; adr store segs inked
+ 		jp scroller.presegs_to_screen
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cube151.calc
+					call @sys.calc.sinus4
+					ld a,h:add a,8:ld l,a:ld h,0
+						ld (rot.mulu),hl ; 38...
+cube151.calc_wo_mulu
+					call scroller.calc.sinus_dx
+					call scroller.calc.sinus_dy
+					jp scroller.calc.sinus_ax
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.cube151
+arrete = #40 ; peu importe, mais pas 0,1,-1,-2
+;pts
+				defb  -arrete,-arrete,-arrete
+				defb  -arrete, arrete,-arrete
+				defb   arrete, arrete,-arrete
+				defb   arrete,-arrete,-arrete
+				defb  -arrete,-arrete, arrete
+				defb  -arrete, arrete, arrete
+				defb   arrete, arrete, arrete
+				defb   arrete,-arrete, arrete
+			defb -1 ; end of pts
+;sides
+tab.pts.cube151_sides0
+				defb 0 ; which pt for z ordering
+					defb 0,3,2,1,#80+1			
+;						defb 1,0,2,3,#80+3			
+					defb 4,5,6,7,#80+1
+;						defb 7,4,6,5,#80+3
+;					defb 0,1,5,4,#80+3 ; face du dessous
+					defb 2,3,7,6,#80+3 ; face du dessus
+					defb 1,2,6,5,#80+2			
+					defb 3,0,4,7,#80+2
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; cubes de premiers plans sans mouvement en X
+gagacubiz_precalc2
+gagacubiz_cube271.precalc
+	; init
+			ld hl,scroller.60n271:call scroller.init
+				ld hl,offset_gagacubiz_last_lite:ld (scroller.o),hl
+			;
+			ld hl,#8000:ld bc,#10000/271*4:ld de,1:ld a,0
+				call scroller.init.sinus_dx
+			ld hl,#0000:ld bc,#10000/271*4:ld de,1:ld a,14
+				call scroller.init.sinus_dy
+			ld hl,#0000:ld bc,#10000-#10000/271:ld de,#280
+				call @sys.calc.sinus3.init.shunt
+			ld hl,#0800:ld bc,#10000-#10000/271:ld de,#120
+				call @sys.calc.sinus4.init.shunt
+			ld hl,tab.pts.cube271
+				call @rot.reset.pts
+		;
+			ld hl,#0E00:ld (rot.ay_16bits),hl
+			ld hl,24:ld (rot.mulu),hl
+		; precalc 
+			ld hl,cube271.calc ; special call for updating parameters
+			ld de,cube271.store_pts ; adr store pts precalc 
+			ld bc,271 ; nb of loops for precalc
+		jp scroller.precalc
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+gagacubiz_cube271
+		; presegs
+			; /!\ pas d'affichage en //, il faut qu'il soit fini						
+			call sys.wait.no_call_at_VBL
+			ld hl,tab.pts.cube271
+				call @rot.reset.object
+			;ld b,%01011111 	; 2323 
+			;ld c,%00001111 	; 2222
+			ld bc,%0101111100001111
+			ld d,%00001111 	; unused but set cos' ink 3 might appear on thin side (non perfect line) 
+				call @rot.gen.trans_ink
+			ld bc,271 ; nb of loops for precalc
+			ld de,cube271.store_pts ; adr store pts precalc 
+			ld hl,cube271.store_segs	; adr store segs inked
+				call scroller.presegs
+		; to screen	
+			ld bc,271 ; nb of loops for precalc
+			ld de,cube271.store_pts ; adr store pts precalc 
+			ld hl,cube271.store_segs	; adr store segs inked
+		jp scroller.presegs_to_screen
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cube271.calc
+					call scroller.calc.sinus_dx
+					call scroller.calc.sinus_dy
+					call @sys.calc.sinus4:ld (rot.az_16bits),hl
+					jp scroller.calc.sinus_ax
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.cube271
+aaa=#40
+;pts
+				defb  -aaa,-aaa,-aaa
+				defb  -aaa, aaa,-aaa
+				defb   aaa, aaa,-aaa
+				defb   aaa,-aaa,-aaa
+				defb  -aaa,-aaa, aaa
+				defb  -aaa, aaa, aaa
+				defb   aaa, aaa, aaa
+				defb   aaa,-aaa, aaa
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 1,0,3,2,#80+1			
+					defb 7,4,5,6,#80+1
+					defb 0,1,5,4,#80+2
+					defb 2,3,7,6,#80+2
+					defb 1,2,6,5,#80+1			
+						defb 1,2,5,6,#80+3			
+					defb 3,0,4,7,#80+1
+						defb 3,0,7,4,#80+3
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz_cubiz.precalc	
+				call splitz.precalc
+			
+			; splitz.unroll ... MOD!
+				ld hl,splitz.unroll+2 ; (splitz.template.mod1-splitz.template) = 1 d'où INC
+				ld a,12
+				ld c,1
+splitz_cubiz.precalc.loop1
+						push hl
+							ld b,c
+							ld (hl),#49:inc hl:inc hl:djnz $-4
+							; #ED,#49 == OUT (C),C
+						pop hl
+						push hl
+							ld de,splitz.template.mod2-splitz.template.mod1:add hl,de
+							ld b,c
+							ld (hl),#49:inc hl:inc hl:djnz $-4
+						pop hl	
+						ld de,splitz.template.ends_here-splitz.template:add hl,de						
+						inc c:dec a
+						jr nz,splitz_cubiz.precalc.loop1
+								
+			; splitz.tab
+				ld hl,splitz.tab
+				ld a,#0C:ld b,34*4:ld (hl),a:inc hl:djnz $-2
+				ld a,#09:ld (hl),a:inc hl
+				ld a,#07:ld (hl),a:inc hl
+				ld a,#02:ld (hl),a:inc hl
+				;ld a,#00:ld (hl),a:inc hl ;+1 ci dessous
+				ld a,#00:ld b,34*4+1:ld (hl),a:inc hl:djnz $-2
+			ret
+				
+splitz_cubiz.subcall
+			; end?
+					ld a,(splitz.template.adr_tab+1)
+					or a
+					jr z,splitz_cubiz.ending
+						
+			; scroll des splits ; -1 -1 et 0 en alternance
+splitz_cubiz.template.adr_tab.cpt3 
+					ld a,2
+					ld hl,(splitz.template.adr_tab+1)
+					inc a:cp 3
+					jr z,2+$+1
+						dec hl
+					jr nz,2+$+1
+						xor a
+					ld (splitz.template.adr_tab+1),hl
+					ld (splitz_cubiz.template.adr_tab.cpt3+1),a
+			
+splitz_cubiz.template.adr_tab.cpt18 
+					ld a,-1
+					inc a
+					ld hl,splitz.tab+34*4+3
+					cp 9:jr nz,splitz_cubiz.template.adr_tab.cpt18_normal
+						ld a,(hl):cp 5:ld a,9:jr nz,splitz_cubiz.template.adr_tab.cpt18_normal
+						ld (hl),0:dec hl
+						ld (hl),2:dec hl
+						ld (hl),7:dec hl
+						ld (hl),9
+						ld hl,(splitz.template.adr_tab+1)
+						dec hl
+						ld (splitz.template.adr_tab+1),hl
+						xor a:ld (splitz_cubiz.template.adr_tab.cpt18+1),a
+						jr splitz_cubiz.template.adr_tab.cpt18_ko
+splitz_cubiz.template.adr_tab.cpt18_normal
+					cp 18:jr nz,2+$+1:xor a
+					ld (splitz_cubiz.template.adr_tab.cpt18+1),a
+					jr nz,splitz_cubiz.template.adr_tab.cpt18_ko
+						inc (hl):dec hl
+						inc (hl):dec hl
+						inc (hl):dec hl
+						ld a,(hl):cp 12:jr z,2+$+1
+							inc (hl)
+splitz_cubiz.template.adr_tab.cpt18_ko					
+			ret			
+splitz_cubiz.ending
+				ld a,#5A:ld (sys.ink3val),a
+				jp splitz_event.ending
+
+		
+									

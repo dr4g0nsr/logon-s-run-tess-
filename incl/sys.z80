@@ -1,0 +1,559 @@
+
+; misc
+; dedicated sinus calls
+; sin & mul
+
+
+	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+; 	miscellaneous
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+sys.wait.no_call_at_VBL
+sys.wait.no_call_at_VBL.loop1	ld hl,(@sys.nb_calls_at_VBL+1):ld a,h:or l:jr nz,sys.wait.no_call_at_VBL.loop1
+sys.wait.no_call_at_VBL.loop2	ld a, (@sys.flag_VBL+1)       :or a       :jr nz,sys.wait.no_call_at_VBL.loop2
+								ret
+sys.put_call_at_VBL_wo_last		ld de,sys_ret
+sys.put_call_at_VBL				ld (sys.call_at_VBL+1),hl
+					 			ld (sys.last_call_at_VBL+1),de
+					 			ld (sys.nb_calls_at_VBL+1),bc
+					 			ret
+sys.put_call_at_VBL_wo_call			ld hl,sys_ret
+								jr sys.put_call_at_VBL
+sys.copy_4000					ld hl,#4000:ld e,l:ld c,l:call sys.copy_1000
+								ld h,#50:call sys.copy_1000
+								ld h,#60:call sys.copy_1000
+								ld h,#70:jp sys.copy_1000
+sys.zik_at_6					ld a,#21:ld (inter.line_00_2.zik),a:ld hl,inter.line_32_6_zik:ld (inter.line_32_6_zik-2),hl:ret
+sys.zik_at_1					ld a,#CD:ld (inter.line_00_2.zik),a:ld hl,inter.ends:ld (inter.line_32_6_zik-2),hl:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sys.to_screen32x32
+	; passage à un écran en 32 décalé, tjs sous split (pour dupliquer les quelques premières lignes)
+		; synchro
+			ld b,#F5:in a,(c):rra:jr nc,$-3 ; wait vsync... qui est avant l'interruption
+			; break
+			; halt:ei:nop:halt:ei ; <-- le chg reg0/reg2 fut testé ainsi
+		; reg0/reg2
+			ld bc,#BC00:out (c),c:	ld bc,#BD3F+8:out (c),c
+			ld b,#30/4-4*0:djnz $ ; 4 pour ligne préc.
+									ld bc,#BD3F:out(c),c ; reg0 décalé
+			ld bc,#BC02:out (c),c:	ld bc,#BD32-8:out (c),c
+			;ld bc,#BC06:out (c),c:	ld bc,#BD00+11:out (c),c
+		; l'interruption arrive dans les 2 scanlines
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sys.conv_vram.convtab
+			ld hl,#1A5E:ld (sys.conv_vram.loop_low),hl ; == LD E,(HL):LD A,(DE)
+			call sys.conv_vram.gen_generate
+			ld d,high sys.conv_vram.tab
+			jp 	sys.conv_vram.common		
+sys.conv_vram.resbit
+			ld hl,#A27E:ld (sys.conv_vram.loop_low),hl ; == LD A,(HL):AND D
+			call sys.conv_vram.gen_generate
+			ld d,%11110000
+			jp 	sys.conv_vram.common		
+sys.conv_vram.gen_generate
+			ld hl,sys.conv_vram.loop_low+4+10-1
+			ld de,sys.conv_vram.gen+#100+10-1
+			ld bc,10:lddr:push de
+			ld bc,4:lddr:pop hl
+			ld bc,252:lddr
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+; 	calls about sinus calculations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+scroller.init.sinus_dx	equ @sys.calc.sinus1.init	; sinus1 == dx
+scroller.init.sinus_dy	equ @sys.calc.sinus2.init	; sinus2 == dy
+scroller.init.sinus_ax	equ @sys.calc.sinus3.init	; sinus3 == ax
+													; sinus4 == whatever!
+scroller.calc.sinus_dx	call @sys.calc.sinus1:ld (scroller.calc.dxraw),hl:ret
+scroller.calc.sinus_dy	call @sys.calc.sinus2:ld (scroller.calc.dyraw),hl:ret
+scroller.calc.sinus_ax	call @sys.calc.sinus3:ld (rot.ax_16bits),hl      :ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+@sys.calc.sinus1.init	
+						push hl:push af:call @sys.mul.16ux16u:pop af:pop hl:ld e,a:ld d,0
+@sys.calc.sinus1.init.shunt	
+						ld (@sys.calc.sinus1.ang+1),hl ; init angle [0000-FFFF]
+						ld (@sys.calc.sinus1.addang+1),bc ; each loop, value added to angle [0000-FFFF]
+						ld l,0:ld h,e:ld a,d:rra:rr h:rr l
+						ld (@sys.calc.sinus1.addfin+1),hl ; val *#80 to keep positive value
+						ex de,hl:add hl,hl
+						ld (@sys.calc.sinus1.mulval+1),hl ; val *2 cos sin from -#40 to +#40
+					ret
+@sys.calc.sinus1						
+@sys.calc.sinus1.ang	ld hl,0
+@sys.calc.sinus1.addang	ld bc,0
+						add hl,bc
+						ld (@sys.calc.sinus1.ang+1),hl
+							call @sys.sinus_16bits
+						ld bc,hl
+@sys.calc.sinus1.mulval	ld de,0
+							call @sys.mul.16sx16s_24smax
+@sys.calc.sinus1.addfin	ld de,0:add hl,de
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@sys.calc.sinus2.init	
+						push hl:push af:call @sys.mul.16ux16u:pop af:pop hl:ld e,a:ld d,0
+@sys.calc.sinus2.init.shunt	
+						ld (@sys.calc.sinus2.ang+1),hl ; init angle [0000-FFFF]
+						ld (@sys.calc.sinus2.addang+1),bc ; each loop, value added to angle [0000-FFFF]
+						ld l,0:ld h,e:ld a,d:rra:rr h:rr l
+						ld (@sys.calc.sinus2.addfin+1),hl ; val *#80 to keep positive value
+						ex de,hl:add hl,hl
+						ld (@sys.calc.sinus2.mulval+1),hl ; val *2 cos sin from -#40 to +#40
+					ret
+@sys.calc.sinus2						
+@sys.calc.sinus2.ang	ld hl,0
+@sys.calc.sinus2.addang	ld bc,0
+						add hl,bc
+						ld (@sys.calc.sinus2.ang+1),hl
+							call @sys.sinus_16bits
+						ld bc,hl
+@sys.calc.sinus2.mulval	ld de,0
+							call @sys.mul.16sx16s_24smax
+@sys.calc.sinus2.addfin	ld de,0:add hl,de
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@sys.calc.sinus3.init	
+						push hl:push af:call @sys.mul.16ux16u:pop af:pop hl:ld e,a:ld d,0
+@sys.calc.sinus3.init.shunt
+						ld (@sys.calc.sinus3.ang+1),hl ; init angle [0000-FFFF]
+						ld (@sys.calc.sinus3.addang+1),bc ; each loop, value added to angle [0000-FFFF]
+						ld l,0:ld h,e:ld a,d:rra:rr h:rr l
+						ld (@sys.calc.sinus3.addfin+1),hl ; val *#80 to keep positive value
+						ex de,hl:add hl,hl
+						ld (@sys.calc.sinus3.mulval+1),hl ; val *2 cos sin from -#40 to +#40
+					ret
+@sys.calc.sinus3						
+@sys.calc.sinus3.ang	ld hl,0
+@sys.calc.sinus3.addang	ld bc,0
+						add hl,bc
+@sys.calc.sinus3.modify	ld a,h:and #FF:ld h,a						
+						ld (@sys.calc.sinus3.ang+1),hl
+							call @sys.sinus_16bits
+						ld bc,hl
+@sys.calc.sinus3.mulval	ld de,0
+							call @sys.mul.16sx16s_24smax
+@sys.calc.sinus3.addfin	ld de,0:add hl,de
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@sys.calc.sinus4.init	
+						push hl:push af:call @sys.mul.16ux16u:pop af:pop hl:ld e,a:ld d,0
+@sys.calc.sinus4.init.shunt
+						ld (@sys.calc.sinus4.ang+1),hl ; init angle [0000-FFFF]
+						ld (@sys.calc.sinus4.addang+1),bc ; each loop, value added to angle [0000-FFFF]
+						ld l,0:ld h,e:ld a,d:rra:rr h:rr l
+						ld (@sys.calc.sinus4.addfin+1),hl ; val *#80 to keep positive value
+						ex de,hl:add hl,hl
+						ld (@sys.calc.sinus4.mulval+1),hl ; val *2 cos sin from -#40 to +#40
+					ret
+@sys.calc.sinus4						
+@sys.calc.sinus4.ang	ld hl,0
+@sys.calc.sinus4.addang	ld bc,0
+						add hl,bc
+						ld (@sys.calc.sinus4.ang+1),hl
+							call @sys.sinus_16bits
+						ld bc,hl
+@sys.calc.sinus4.mulval	ld de,0
+							call @sys.mul.16sx16s_24smax
+@sys.calc.sinus4.addfin	ld de,0:add hl,de
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+@sys.calc.sinus1delta
+					; hl: final add
+					; de: n delta * addang
+					push hl
+; 						ld bc,(@sys.calc.sinus1.addang+1)
+; 							call @sys.mul.16ux16u
+						ld hl,(@sys.calc.sinus1.ang+1):add hl,de;bc
+							call @sys.sinus_16bits
+						ld bc,hl:ld de,(@sys.calc.sinus1.mulval+1)
+							call @sys.mul.16sx16s_24smax
+						ld de,(scroller.calc.dxraw):or a:sbc hl,de
+						ex de,hl:ld hl,(@sys.calc.sinus1.addfin+1):add hl,de
+						ex de,hl:ld hl,(@rot.dx_center_iso+1):add hl,de
+					pop de
+					add hl,de
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+@sys.calc.sinus2delta
+					; hl: final add
+					; de: n delta * addang
+					push hl
+						ld hl,(@sys.calc.sinus2.ang+1):add hl,de 
+							call @sys.sinus_16bits
+						ld bc,hl:ld de,(@sys.calc.sinus2.mulval+1)
+							call @sys.mul.16sx16s_24smax
+						ld de,(scroller.calc.dyraw):or a:sbc hl,de
+						ex de,hl:ld hl,(@sys.calc.sinus2.addfin+1):add hl,de
+						ex de,hl:ld hl,(@rot.dy_center_iso+1):or a:sbc hl,de
+					pop de
+					add hl,de
+				ret
+								
+								
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	module sys ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.float_b14
+		ld hl,de
+		add hl,hl ; if carry, hl is negative
+		jr c,mul.float_b14.hl_neg
+		add hl,hl ; if carry, it's 1 == #4000
+		jr c,mul.float_b14.hl_4000
+		ex de,hl
+		bit 7,b:jp z,mul.16ux16u
+		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+mul.float_b14.pn
+		call mul.16ux16u
+		ex de,hl:xor a:ld h,a:ld l,a:sbc hl,de
+		ret
+mul.float_b14.hl_4000	
+		ld hl,bc:ret ; easy isn't it
+mul.float_b14.hl_neg
+		xor a:ld h,a:ld l,a:sbc hl,de:add hl,hl:add hl,hl
+		jr c,mul.float_b14.hl_C000
+		ex de,hl
+		bit 7,b: jr z,mul.float_b14.pn
+		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+		jp mul.16ux16u
+mul.float_b14.hl_C000
+		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; mul.16sx16s ; 16 higher bits only
+; 		bit 7,d: jr nz,mul.16sx16s.n
+; 		bit 7,b: jp z,mul.16ux16u
+; mul.16sx16s.pn	
+; 		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+; 		jr mul.16sx16s.np
+; mul.16sx16s.n
+; 		xor a:ld h,a:ld l,a:sbc hl,de:ex de,hl
+; 		bit 7,b:jr nz,mul.16sx16s.nn
+; mul.16sx16s.np
+; 		call mul.16ux16u
+; 		ex de,hl
+; 		xor a:ld h,a:ld l,a:sbc hl,de
+; 		ret
+; mul.16sx16s.nn
+; 		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+; 		jp mul.16ux16u
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.16sx16s_24smax
+		bit 7,d: jr nz,mul.16sx16s_24smax.n
+		bit 7,b: jr z,mul.16sx16s_24smax.pp
+mul.16sx16s_24smax.pn	
+		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+		jr mul.16sx16s_24smax.np
+mul.16sx16s_24smax.n
+		xor a:ld h,a:ld l,a:sbc hl,de:ex de,hl
+		bit 7,b:jr nz,mul.16sx16s_24smax.nn
+mul.16sx16s_24smax.np
+		call mul.16ux16u
+		ld d,l:ld e,b;ld e,c
+		xor a:ld h,a:ld l,a:sbc hl,de
+	sub c:jr nc,2+$+1:dec hl
+	ld b,l:ld c,a
+		ret
+mul.16sx16s_24smax.nn
+		xor a:ld h,a:ld l,a:sbc hl,bc:ld bc,hl
+mul.16sx16s_24smax.pp
+		call mul.16ux16u
+		ld h,l:ld l,b;ld l,c
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.16ux16u ifused ; hlbc = bc*de
+		; (h*256+l)*(b*256+c)=h*b*256*256+(h*c+l*b)*256+l*c
+		ld h,d : ld l,b : push hl
+		       : ld l,c : push hl ; ld h,d 
+		ld h,e : ld l,b : push hl
+		ld d,c ; ld e,e
+		; 1st lo1*lo2
+		call mul.8ux8u_sde_left ; hl=d*e, bc unchanged!	
+		sbc hl,de               ; left: sbc to have result of multiplication
+		; (hi1*lo2+hi2*lo1)*256
+		ld b,0
+		ld c,h
+				ld a,l		; yet no need to have hlbc as result, hlbx is enough, xx unknown
+				ex af,af'
+; 	ld a,l
+; 	ld (mul.16ux16u.backup_l+1),a
+		pop de
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		add hl,bc
+		ld c,l
+		ld b,h
+		pop de
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		add hl,bc
+		ld bc,hl
+		pop de
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld d,0: ld e,b 
+		add hl,de
+				ld b,c
+				ex af,af'
+				ld c,a
+; 	ld b,c
+; mul.16ux16u.backup_l
+; 	ld c,0
+		ret
+		endif
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.16ux16u_16u_max ifused ; hl*bc
+		; does mean: result is not 32 bit but 16 bit only
+		; implies: no need to have 256x256xhi1xhi2 cos' it's null
+		; note: no fast anwser is needed, no optimization
+		ld d,h
+		ld e,c
+		push de
+		ld d,l
+		ld e,b
+		push de
+		ld d,l
+		ld e,c
+		; 1st lo1*lo2
+		call mul.8ux8u_sde_left ; hl=d*e, bc unchanged!	
+		sbc hl,de               ; left: sbc to have result of multiplication
+		; (hi1*lo2+h2*lo1)*256
+		ld b,h
+		ld c,l
+		pop de
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld a,l
+		add a,b
+		ld b,a
+		pop de
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld a,l
+		add a,b
+		ld h,a
+	ld l,c ; ld l,b - previously bug !!!???
+		; and A is hi byte (if needed)
+		ret
+		endif
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.8sx16s ; hl(d) = a*bc / 256, a 8 bits signed, bc 16 bits signed
+;		or a
+;		jr nz,2+$+3+1
+;		ld hl,0
+;		ret
+		bit 7,a
+		jr nz,mul.8sx16s_a_neg
+mul.8ux16s
+		; a > 0
+		bit 7,b
+		jr nz,mul.8sx16s_bc_neg
+mul.8ux16u ; hl(d) = a*bc / 256
+		ld d,a
+		ld e,c
+		ld c,a ; A backup
+mul.8sx16s_shunt
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld d,c
+		ld e,b
+		ld c,h ; backup hi byte result
+		ld b,l ; backup lo byte result	
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld d,b
+		ld b,0
+		add hl,bc
+		ret
+mul.8sx16s_a_neg
+		; a < 0
+		neg
+		bit 7,b
+		jr nz,mul.8sx16s_abc_neg
+		ld d,a
+		ld e,c
+		ld c,a ; A backup
+mul.8sx16s_shunt_neg
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ld d,c
+		ld e,b
+		ld c,h ; backup (-) hi byte result
+		call mul.8ux8u_sde_left
+		ex de,hl
+		sbc hl,de
+		ld a,l
+		sub c
+		ld l,a
+		ret nc
+		dec h
+		ret
+mul.8sx16s_bc_neg
+		ld hl,0
+		or a
+		sbc hl,bc
+		ld d,a
+		ld e,l
+		ld b,h
+		ld c,a ; A backup
+		jr mul.8sx16s_shunt_neg
+mul.8sx16s_abc_neg
+		ld hl,0
+		or a
+		sbc hl,bc
+		ld d,a
+		ld e,l
+		ld b,h
+		ld c,a ; A backup
+		jr mul.8sx16s_shunt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+mul.8sx8s ; hl = d*e, d 8 bits signed, e 8 bits signed, a corrupted, bc kept
+		bit 7,d
+		jr nz,mul.8sx8s_d_neg
+		bit 7,e
+		jr nz,mul.8sx8s_e_neg
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ret
+mul.8sx8s_d_neg
+		xor a
+		sub d
+		ld d,a
+		bit 7,e
+		jr nz,mul.8sx8s_de_neg
+		call mul.8ux8u_sde_left
+		ex de,hl
+		sbc hl,de
+		ret
+mul.8sx8s_e_neg
+		xor a
+		sub e
+		ld e,a
+		call mul.8ux8u_sde_left
+		ex de,hl
+		sbc hl,de
+		ret
+mul.8sx8s_de_neg
+		xor a
+		sub e
+		ld e,a
+		call mul.8ux8u_sde_left
+		sbc hl,de
+		ret
+mul.sqr.8u_sde_left ; hl=a^2, bc unchanged!
+		ld d,a : ld e,a
+mul.8ux8u_sde_left ; hl=d*e, bc unchanged!
+	    ld a,d
+	    sub	e
+	   	jr nc,2+$+2 ; case (d-e)<0
+	   	neg         ; take (e-d) cos same square
+	    ld h,mul.tab/256 
+	    ld l,a
+	    ld a,d
+	    add a,e
+	   	jr c,mul.255x255_sum_more_than_256 ; autocommentary
+	    ld e,(hl)
+	    inc h
+	    ld d,(hl)
+	    ld l,a
+	    ld a,(hl)
+	    dec h
+	    ld l,(hl)
+	    ld h,a
+	    ;or a ; carry set when add a,e = no carry
+	    ret 
+mul.255x255_sum_more_than_256
+	    ld e,(hl)
+	    inc h
+	    ld d,(hl)
+	    ld l,a
+	    ld h,mul.tab/256+3
+	    ld a,(hl)
+	    dec h
+	    ld l,(hl)
+	    ld h,a
+	    or a ; carry set when add a,e = carry
+	    ret 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+cos.tab
+    dw 16384,16379,16364,16340,16305,16261,16207,16143
+    dw 16069,15986,15893,15791,15679,15557,15426,15286
+    dw 15137,14978,14811,14635,14449,14256,14053,13842
+    dw 13623,13395,13160,12916,12665,12406,12140,11866
+    dw 11585,11297,11003,10702,10394,10080,9760,9434
+    dw 9102,8765,8423,8076,7723,7366,7005,6639
+    dw 6270,5897,5520,5139,4756,4370,3981,3590
+    dw 3196,2801,2404,2005,1605,1205,804,402
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sinus_16384
+	sub 64 ; sin(x) = cos(x-pi/2)
+cosinus_16384
+	; input: A = angle 0-255 for full 2*pi
+	; output: HL
+	; BC corrupted
+	ld hl,cos.tab
+	add a,a
+	jr nc,cosinus_16384_00_7F
+	jr z,cosinus_16384_41_80
+cosinus_16384_80_FF
+	neg
+cosinus_16384_00_7F
+	bit 7,a
+	jr z,cosinus_16384_00_3F
+cosinus_16384_40_7F
+	neg
+	bit 7,a
+	jr z,cosinus_16384_41_80
+	ld hl,0
+	ret
+cosinus_16384_41_80
+	add a,l : ld l,a 
+	;assert high sys.cos.tab = high (sys.cos.tab+64)
+	jr nc,2+$+1 : inc h
+	ld c,(hl) : inc hl : ld b,(hl)
+	xor a
+	ld hl,0
+	sbc hl,bc
+	ret	
+cosinus_16384_00_3F	
+	add a,l : ld l,a
+	;assert high sys.cos.tab = high (sys.cos.tab+64)
+	jr nc,2+$+1 : inc h
+	ld l,a : ld a,(hl) : inc hl : ld h,(hl) : ld l,a
+	ret
+sinus_16bits			ld de,#C000:add hl,de
+; cosinus_16bits			ex de,hl:ld a,e:or a:ld a,d:jr z,cosinus_16384
+; 							call cosinus_16384:ld (cosinus_16bits_hl1+1),hl
+; 						ld a,d:inc a
+; 						   	call cosinus_16384:ld (cosinus_16bits_hl2+1),hl
+; 						ld a,e:ld (cosinus_16bits_a1+1),a:neg
+; cosinus_16bits_hl1		ld bc,0:call mul.8ux16s:push hl
+; cosinus_16bits_a1		ld a,0						
+; cosinus_16bits_hl2		ld bc,0:call mul.8ux16s:pop bc
+; 						add hl,bc
+; 						ret
+cosinus_16bits			ex de,hl:ld a,e:or a:ld a,d:jr z,cosinus_16384
+							call cosinus_16384:push hl
+						ld a,d:inc a
+						   	call cosinus_16384:pop bc:push hl
+						ld a,e:push af:neg
+						call mul.8ux16s:pop af:pop bc:push hl
+						call mul.8ux16s:pop bc
+						add hl,bc
+						ret	
+	endmodule
+	
+	
+	

@@ -1,0 +1,344 @@
+; lg.script
+; lg.put_lin
+; lg.put_col
+; lgsy.put_lin
+; lgsy.put_col
+; lgdel.call_int
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lg.int_call	
+lg.script_call	jp lg.script_next
+				
+lgsy.tempo_before
+				ld a,timing_lgtempo_before
+				dec a:ld (lgsy.tempo_before+1),a
+				ret nz
+				jr lg.script_next
+lgsy.tempo_middle
+				ld a,timing_lgtempo_middle
+				dec a:ld (lgsy.tempo_middle+1),a
+				ret nz
+lg.script_next
+lg.script_adr
+				ld hl,lg.script.tab_call
+				ld e,(hl):inc hl:ld d,(hl):inc hl
+				ld (lg.script_adr+1),hl
+				ld (lg.script_call+1),de
+				ret	
+lg.script_ends
+				ld hl,0:ld (sys.nb_calls_at_VBL+1),hl
+				ret
+				
+	
+lg.script.tab_call
+		dw 	lgsy.tempo_before													; temporisation
+		dw 	lg.put_lin_first 													; barres doubles du LOGON
+		dw 	lgsy.put_lin_first													; lignes doubles de SYSTEM
+		dw 	lgsy.put_lin_first,lgsy.put_lin_first.fix_for_E,lgsy.put_lin_first	; lignes internes de SYSTEM
+		dw  lgsy.tempo_middle													; temporisation
+		dw 	lg.put_lin_first 													; barres résiduelles du LOGON
+		dw 	lg.put_col_first 													; reste horizontal LOGON
+		dw 	lgsy.put_col_first 													; reste vertical SYSTEM
+		dw 	lg.script_ends
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lg.width_scr 		equ 51
+lg.system_base 		equ #4000+lg.width_scr*2*15+4
+lg.logon_base 		equ #4000+lg.width_scr*2*4+4
+lg.logon_base2 		equ lg.logon_base-lg.width_scr*2+#1800
+
+lg.put_lin.where_tab
+		dw lg.logon_base2+0*10+lg.width_scr*2*0:db 4*10
+		dw lg.logon_base2+2*10+lg.width_scr*2*0:db 4*10
+		dw lg.logon_base2+3*10+lg.width_scr*2*0:db 4*10
+		dw lg.logon_base2+5*10+lg.width_scr*2*0:db 4*10
+		dw lg.logon_base2+7*10+lg.width_scr*2*0:db 4*10
+		dw lg.logon_base2+8*10+lg.width_scr*2*0:db 4*10
+		dw 0:db 0
+		dw lg.logon_base2+1*10+lg.width_scr*2*0:db 4*6
+		dw lg.logon_base2+1*10+lg.width_scr*2*7:db 4*3
+		dw lg.logon_base2+4*10+lg.width_scr*2*0:db 4*3
+		dw lg.logon_base2+4*10+lg.width_scr*2*4:db 4*6
+		dw lg.logon_base2+6*10+lg.width_scr*2*0:db 4*6
+		dw lg.logon_base2+6*10+lg.width_scr*2*7:db 4*3
+		dw 0
+	
+
+lg.put_lin
+lg.put_lin_adr
+	ld de,0
+lg.put_lin.lgh_where
+	ld bc,0
+	call lg.put_lin_5lines
+	ld (lg.put_lin.lgh_where+1),bc
+lg.put_lin_nb
+	ld a,0:dec a:ld (lg.put_lin_nb+1),a
+	ret nz
+lg.put_lin_first
+lg.put_lin.where_adr
+	ld hl,lg.put_lin.where_tab
+	ld e,(hl):inc hl:ld d,(hl):inc hl:ld a,(hl):inc hl
+	ld (lg.put_lin_nb+1),a
+	ld (lg.put_lin.where_adr+1),hl
+	ld hl,lg.put_lin.lgh_tab
+	ld (lg.put_lin.lgh_where+1),hl
+	ld hl,lg.put_lin
+	ld (lg.script_call+1),hl
+	ld (lg.put_lin_adr+1),de
+	ld a,d:or e
+	ret nz
+	jp lg.script_next
+
+lg.put_lin_5lines	; BC=qlqpart dans lgtab ; 
+			ld ixh,7:jr lg.put_lin_1line			
+lg.put_lin_1line.pre_inc		
+				ld a,e:sub 7:ld e,a:jr nc,2+$+1:dec d
+				ld a,d:add a,8:bit 6,a:jr nz,lg.put_lin_1line-1 ; ne marche qu'en #4000 (sinon #C000)
+					ld a,e:add a,lg.width_scr*2:ld e,a:ld a,d:jr nc,2+$+1:inc a:sub #38 ; +1 ligne de caractère
+				ld d,a
+lg.put_lin_1line
+				ld a,ixh:cp 5:jr nz,2+$+4:ld (lg.put_lin_adr+1),de
+				call lg.put_lin_7FC3
+				dec ixh:jr nz,lg.put_lin_1line.pre_inc
+				ld a,c:cp low lg.put_lin.lgh_tab.ends:jr nz,2+$+6
+					sub 7*2:ld c,a:jr nc,2+$+1:dec b
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				
+lg.put_col.where_tab
+	dw lg.logon_base+6+0*10+lg.width_scr*2*7
+	dw lg.logon_base+6+1*10+lg.width_scr*2*0
+	dw lg.logon_base+6+1*10+lg.width_scr*2*7
+	dw lg.logon_base+6+3*10+lg.width_scr*2*0
+	dw lg.logon_base+6+3*10+lg.width_scr*2*7
+	dw lg.logon_base+6+5*10+lg.width_scr*2*0
+	dw lg.logon_base+6+5*10+lg.width_scr*2*7
+	dw lg.logon_base+6+6*10+lg.width_scr*2*7
+	dw lg.logon_base+6+7*10+lg.width_scr*2*0
+	dw 0
+	
+lg.put_col
+lg.put_col_adr
+	ld hl,0
+lg.put_col_call
+	call 0
+	ld (lg.put_col_call+1),bc
+lg.put_col_nb
+	ld a,0:dec a:ld (lg.put_col_nb+1),a
+	ret nz
+lg.put_col_first
+lg.put_col.where_adr
+	ld hl,lg.put_col.where_tab
+	ld e,(hl):inc hl:ld d,(hl):inc hl
+	ld (lg.put_col.where_adr+1),hl
+	ld (lg.put_col_adr+1),de
+	ld hl,lg.put_col_32lines_right
+	ld (lg.put_col_call+1),hl
+	ld hl,lg.put_col
+	ld (lg.script_call+1),hl
+	ld a,10:ld (lg.put_col_nb+1),a
+	ld a,d:or e
+	ret nz
+	jp lg.script_next
+
+lg.put_col_32lines_left.pre_inc
+	inc hl
+	ld (lg.put_col_adr+1),hl
+lg.put_col_32lines_left
+	ld bc,lg.put_col_32lines_right
+	ld de,%0011001100001100
+	call lg.put_col_8lines_left
+	call lg.put_col_8lines_left.pre_inc
+lg.put_col_8lines_left.pre_inc
+	ld a,l:add a,lg.width_scr*2:ld l,a :jr nc,2+$+1:inc h
+lg.put_col_8lines_left
+	jp lg.put_col_left_7FC3
+	
+lg.put_col_32lines_right
+	ld bc,lg.put_col_32lines_left.pre_inc
+	ld e,%00001111
+	call lg.put_col_8lines_right
+	call lg.put_col_8lines_right.pre_inc
+lg.put_col_8lines_right.pre_inc
+	ld a,l:add a,lg.width_scr*2:ld l,a :jr nc,2+$+1:inc h
+lg.put_col_8lines_right
+	jp lg.put_col_right_7FC3
+	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lgsy.put_col.where_tab
+	dw lg.system_base+0*15+0*12+lg.width_scr*2*0:db 3
+	dw lg.system_base+0*15+1*12+lg.width_scr*2*1:db 3
+	dw lg.system_base+1*15+0*12+lg.width_scr*2*0:db 3
+	dw lg.system_base+1*15+  6 +lg.width_scr*2*1:db 3
+	dw lg.system_base+1*15+1*12+lg.width_scr*2*0:db 3
+	dw lg.system_base+2*15+0*12+lg.width_scr*2*0:db 3
+	dw lg.system_base+2*15+1*12+lg.width_scr*2*1:db 3
+	dw lg.system_base+3*15+  6 +lg.width_scr*2*0:db 5
+	dw lg.system_base+4*15+0*12+lg.width_scr*2*0:db 5
+	dw lg.system_base+5*15+0*12+lg.width_scr*2*0:db 5
+	dw lg.system_base+5*15+  6 +lg.width_scr*2*0:db 3
+	dw lg.system_base+5*15+1*12+lg.width_scr*2*0:db 5
+	dw 0
+	
+lgsy.put_col
+lgsy.put_col_adr
+	ld hl,0
+	ld de,%0011001111001100
+	ld bc,%1111111100000000
+lgsy.put_col_nb
+	ld a,0:dec a:ld (lgsy.put_col_nb+1),a
+	push af
+	jr z,2+$+2:ld b,d:ld c,e
+	call lgsy.put_col_7FC3
+	bit 5,h:jr nz,lgsy.put_col.next_charline
+		set 5,h:jr lgsy.put_col.go_on
+lgsy.put_col.next_charline
+		ld de,lg.width_scr*2+#E000
+		add hl,de	
+lgsy.put_col.go_on
+	ld (lgsy.put_col_adr+1),hl
+	pop af
+	ret nz
+lgsy.put_col_first
+lgsy.put_col.where_adr
+	ld hl,lgsy.put_col.where_tab
+	ld e,(hl):inc hl:ld d,(hl):inc hl:ld a,(hl):inc hl
+	ld (lgsy.put_col.where_adr+1),hl
+	ld (lgsy.put_col_nb+1),a
+	ld hl,lgsy.put_col
+	ld (lg.script_call+1),hl
+	ld (lgsy.put_col_adr+1),de
+	ld a,d:or e
+	ret nz
+	jp lg.script_next
+
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lgsy.put_lin.where_tab
+	dw lg.system_base+0*15+lg.width_scr*2*0
+	dw lg.system_base+2*15+lg.width_scr*2*0
+	dw lg.system_base+4*15+lg.width_scr*2*0
+	dw lg.system_base+0*15+lg.width_scr*2*2
+	dw lg.system_base+2*15+lg.width_scr*2*2
+	dw lg.system_base+4*15+lg.width_scr*2*2
+	dw 0
+	dw lg.system_base+0*15+lg.width_scr*2*1
+	dw lg.system_base+1*15+lg.width_scr*2*1
+	dw lg.system_base+2*15+lg.width_scr*2*1
+	dw lg.system_base+3*15+lg.width_scr*2*0
+	dw 0
+	dw lg.system_base+4*15+lg.width_scr*2*1
+	dw 0
+	dw lg.system_base+5*15+lg.width_scr*2*0
+	dw 0
+	
+lgsy.put_lin
+lgsy.put_lin_adr
+	ld hl,0
+	ld de,%0000000011111111
+lgsy.put_lin_nb
+	ld a,0:dec a:ld (lgsy.put_lin_nb+1),a
+	push af
+	jr nz,2+$+3:ld de,%0011001111001100
+	call lgsy.put_lin_7FC3
+	inc hl
+	ld (lgsy.put_lin_adr+1),hl
+	pop af
+	ret nz
+lgsy.put_lin_first
+	ld a,13
+lgsy.put_lin.where_adr
+	ld hl,lgsy.put_lin.where_tab
+	ld e,(hl):inc hl:ld d,(hl):inc hl
+	ld (lgsy.put_lin.where_adr+1),hl
+	ld (lgsy.put_lin_nb+1),a
+	ld hl,lgsy.put_lin
+	ld (lg.script_call+1),hl
+	ld (lgsy.put_lin_adr+1),de
+	ld a,d:or e
+	ret nz
+	jp lg.script_next
+
+lgsy.put_lin_first.fix_for_E
+	ld a,7:jr lgsy.put_lin_first+2
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lgdel.hcar equ 2
+
+lgdel.init
+ 			ld de,lgdel.init_go
+ 			ld bc,timing_lgdel
+			jp sys.put_call_at_VBL_wo_call	
+lgdel.init_go
+			ld hl,lgdel.call_int
+			ld de,lgdel.call_last
+			ld bc,17*(20/lgdel.hcar)
+			jp sys.put_call_at_VBL
+
+			
+				; 51*20 == 17 * (3*4) *5
+lgdel.call_last
+			ld a,1:ld (lgdel.backup_loop1-1),a:ld (lgdel.restore_loop1-1),a
+			ld a,8:ld (lgdel.backup_loop1+1),a:ld (lgdel.restore_loop1+1),a
+			ld hl,#4800-8:jp lgdel.backup.shunt
+
+			
+lgdel.call_int
+lgdel.backup ; input? x & y
+			ld hl,0
+			ld a,(lgdel.backup_y):or a:jr z,2+$+7
+			ld b,a:ld de,51*2*lgdel.hcar:add hl,de:djnz $-1
+			ld a,(lgdel.backup_x):ld c,a:add a,a:add a,c:add a,a:ld c,a
+			ld b,#40:add hl,bc
+lgdel.backup.shunt
+			ld de,lgdel.backup.buffer ; 192 bytes
+			push hl:push de
+			ld bc,#7FC2:out (c),c
+			ld c,lgdel.hcar
+lgdel.backup_loop1
+			ld b,6
+lgdel.backup_loop0
+			ld a,(hl):ld (de),a:set 3,h:inc de
+			ld a,(hl):ld (de),a:set 4,h:inc de
+			ld a,(hl):ld (de),a:res 3,h:inc de
+			ld a,(hl):ld (de),a:set 5,h:inc de
+			ld a,(hl):ld (de),a:set 3,h:inc de
+			ld a,(hl):ld (de),a:res 4,h:inc de
+			ld a,(hl):ld (de),a:res 3,h:inc de
+			ld a,(hl):ld (de),a:res 5,h:inc de
+			inc hl:djnz lgdel.backup_loop0
+			ld a,l:add a,51*2-6:ld l,a:jr nc,2+$+1:inc h
+			dec c:jr nz,lgdel.backup_loop1
+			pop de:pop hl
+			;
+			call lgdel.restore_7FC3
+			;
+			ld hl,(lgdel.backup_x)
+			ld bc,7*256+17
+			ld de,7*256+20/lgdel.hcar
+			ld a,l ;x
+			add a,b:inc d:sub c:jr nc,2+$+2:dec d:add a,c
+			ld l,a			
+			ld a,h ;y
+			add a,d:sub e:jr nc,2+$+1:add a,e
+			ld h,a
+			or l:jr nz,2+$+1:inc h
+			ld (lgdel.backup_x),hl
+		ret	
+lgdel.backup_x	db 0
+lgdel.backup_y	db 0			

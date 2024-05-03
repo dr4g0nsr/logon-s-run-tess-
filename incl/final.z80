@@ -1,0 +1,737 @@
+
+final.precalc
+		
+ 	 	; init buffer sprite
+			ld a,48:call @rot.reset.scr_width_wo_set_CRTC
+			ld a,high adr_spr_draw_final:ld (@rot.adr_spr_draw),a
+			ld a,high adr_spr_fill_final:ld (@rot.adr_spr_fill),a
+ 			ld c,5:call @rot.reset.size_spr ; 16x16 
+			ld hl,#8000:ld a,#40:call @rot.reset.size_spr.fix_height
+			ld hl,adr_spr_final:ld (hl),0:ld de,adr_spr_final+1:ld bc,#E000-adr_spr_final-1:ldir ;attention en // à gameboy_after, l'adresse doit être utilisée (?) à vérifier
+			
+		; init scroller - inutile d'ailleurs! ahah		
+			ld hl,scroller.48n32:call scroller.init ; on s'en fout, c'est pour remettre à zéro les compteurs / call scroller.reinit sans HL
+			ld a,#21:ld (scroller.calc.fix_no_nextstep),a ; inhibe call scroller.nextstep
+ 
+		; init rot & object (commun)
+			 ld bc,%0000111110101010:ld d,b:call @rot.gen.trans_ink ; 1+2=3 ->1
+			; test sans trame			
+			; ld bc,%0000111111111111:ld d,b:call @rot.gen.trans_ink ; 1+2=3 ->1
+			ld hl,#0000:ld (scroller.calc.dxraw),hl:ld (scroller.calc.dyraw),hl
+			ld hl,#19A:ld (rot.mulu),hl
+			ld hl,final0.calc:ld (scroller.calc.call_spec+1),hl
+		
+	; 8-Bit
+			ld hl,#4000+#0C00:ld (rot.ay_16bits),hl ; 4000++ la droite avance, la gauche recule
+			ld hl,#0000+#0C00:ld (rot.az_16bits),hl ; 0000++ penche vers l'arrière, le devant monte
+		      ld hl,#C000+#0000:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+		; 8
+			;ld hl,#C000+#0600:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+			ld hl,final.scroller_o-2:ld (scroller.o),hl
+			ld hl,final.tab_pts.8_a:call final.call0
+			ld hl,final.tab_pts.8B_b:call final.call0	
+			ld hl,final.tab_pts.8B_c:call final.call0
+		; -
+			;ld hl,#C000+#0000:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+			ld hl,final.scroller_o+12-96*0:ld (scroller.o),hl
+			ld hl,final.tab_pts.pt_:call final.call0
+		; B
+			;ld hl,#C000-#0300:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+			ld hl,final.scroller_o+34:ld (scroller.o),hl
+			ld hl,final.tab_pts.B_a:call final.call0
+			ld hl,final.tab_pts.8B_b:call final.call0	
+			ld hl,final.tab_pts.8B_c:call final.call0
+		; i
+			;ld hl,#C000+#0000:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+			ld hl,final.scroller_o+54+96*0:ld (scroller.o),hl
+			ld hl,final.tab_pts.I_:call final.call0
+		; t
+			;ld hl,#C000+#0C00:ld (rot.ax_16bits),hl ; C000++ penche vers la gauche
+			ld hl,final.scroller_o+66:ld (scroller.o),hl
+			ld hl,final.tab_pts.T_a:call final.call0	
+			ld hl,final.tab_pts.T_b;call final.call0
+		;ret
+final.call0	call @rot.reset.pts_then_object
+			call scroller.calc_to_screen_once
+			call @rot.gen.sides_segs_z
+			call @rot.draw_all
+			call sprite.put_sprite
+final0.calc 
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+final.final_loop
+ 					; wait for end of middle screen to start update
+			 			ld a,(inter.which_int+1):cp low inter.line_32_6.final:jr nz,$-2-3
+			 			
+ 			 		; update offset at top
+ if cond.colorz
+ else
+final.cpt_offset_top 	ld a,0
+						dec a:cp -1:jr nz,2+$+2:ld a,30:ld (final.cpt_offset_top+1),a
+						call final.get_offset
+						ld a,d:ld (inter.final_offset_top+6),a
+						ld a,e:ld (inter.final_offset_top+16),a
+ endif
+					
+					; update offset at bottom				
+ if cond.colorz
+ else
+final.cpt_offset_bottom	ld a,24-1
+						dec a:cp -1:jr nz,2+$+2:ld a,30:ld (final.cpt_offset_bottom+1),a
+						call final.get_offset
+						ld a,d:ld (inter.final_offset_bottom+6),a
+						ld a,e:ld (inter.final_offset_bottom+16),a
+ endif
+ 
+					; scroll at middle screen
+ if cond.colorz
+					ld a,0:inc a:and 31:ld ($-4),a:jr z,final.final_loop.colorz	
+					halt:halt:halt:halt
+					jr final.final_loop			
+final.final_loop.colorz	
+ endif		
+						call final.cpt
+ 
+					jr final.final_loop			
+ 				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+final.get_offset ; input A 0..30
+			ld hl,final.tab_offset
+			add a,a:add a,l:ld l,a:jr nc, 2+$+1:inc h
+			ld e,(hl):inc hl:ld d,(hl)
+			ret
+final.tab_offset
+			dw #1C10+48*(0*4+0+0)
+			dw #1C10+48*(1*4+0+0)
+			dw #1C10+48*(2*4+0+0)
+			dw #1C10+48*(3*4+0+0)
+			dw #1C10+48*(4*4+0+0)
+			dw #1C10+48*(5*4+0+0)
+			dw #2000+48*(0*4+3+0)
+			dw #2000+48*(1*4+3+0)
+			dw #1C10+48*(0*4+0+1)
+			dw #1C10+48*(1*4+0+1)
+			dw #1C10+48*(2*4+0+1)
+			dw #1C10+48*(3*4+0+1)
+			dw #1C10+48*(4*4+0+1)
+			dw #1C10+48*(5*4+0+1)
+			dw #2000+48*(0*4+3+1)
+			dw #2000+48*(1*4+3+1)
+			dw #1C10+48*(0*4+0+2)
+			dw #1C10+48*(1*4+0+2)
+			dw #1C10+48*(2*4+0+2)
+			dw #1C10+48*(3*4+0+2)
+			dw #1C10+48*(4*4+0+2)
+			dw #1C10+48*(5*4+0+2)
+			dw #2000+48*(0*4+3+2)
+			dw #2000+48*(1*4+3+2)
+			dw #1C10+48*(0*4+0+3)
+			dw #1C10+48*(1*4+0+3)
+			dw #1C10+48*(2*4+0+3)
+			dw #1C10+48*(3*4+0+3)
+			dw #1C10+48*(4*4+0+3)
+			dw #1C10+48*(5*4+0+3)
+			dw #2000+48*(0*4+3+3)
+			;dw #2000+48*(1*4+3+3)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+final.cpt  		ld hl,final.tab_call
+				ld ix,final.cpt_do_ret:ld b,#7F:
+final.cpt.fix_bank 								ld de,#C1C2:exx:ld bc,9:exx: ; prereq 
+final.cpt.fix_nb_lines		ld c,21*8
+				xor a
+final.cpt_loop	or (hl):jr nz,final.cpt_do	
+final.cpt_loop0 inc l
+				dec c:jr nz,final.cpt_loop
+				ld a,(final.cpt+1):dec a:cp -1:jr nz,2+$+2:ld a,30:ld (final.cpt+1),a
+			ret
+final.cpt_do	push hl
+					inc h:ld l,(hl):ld h,a
+					ld a,c:exx:ld l,a
+					ld h,2+high final.tab_adr_scr
+					ld d,(hl) ; d for mask 		
+					dec h:ld a,(hl):dec h:ld l,(hl):ld h,a
+					exx
+					jp (hl)
+final.cpt_do_ret exx 
+				pop hl				
+			xor a		
+			jr final.cpt_loop0
+;forme    enlever  mettre
+; .XX.XX.. .XX.XX.. ........
+; XXXXXXX. X..X..X. ........
+; XXXXXXX. ........ ........
+; XXXXXXX. ........ X.....X.
+; .XXXXX.. ........ .X...X..
+; ..XXX... ........ ..X.X...
+; ...X.... ........ ...X....
+final.line00	exx
+				ld d,(high final.tab_mask)+2
+				inc hl
+				call final.gen_adr
+				call final.gen_adr
+				inc hl
+				call final.gen_adr
+				call final.gen_adr
+				jp (ix)
+final.line04	exx
+				ld d,(high final.tab_mask)+2
+				call final.gen_adr
+				inc hl
+				inc hl
+				call final.gen_adr
+				inc hl
+				inc hl
+				call final.gen_adr+#80
+				jp (ix)
+final.line14	exx
+				; d already set
+				call final.gen_adr
+				inc hl
+				inc hl
+				inc hl
+				inc hl
+				inc hl
+				call final.gen_adr+#80
+				jp (ix)
+final.line18	exx
+				; d already set
+				inc hl
+				call final.gen_adr
+				inc hl
+				inc hl
+				inc hl
+				call final.gen_adr
+				jp (ix)
+final.line22	exx
+				; d already set
+				inc hl
+				inc hl
+				call final.gen_adr
+				inc hl
+				call final.gen_adr
+				jp (ix)
+final.line26	exx
+				; d already set
+				inc hl
+				inc hl
+				inc hl
+				call final.gen_adr
+				jp (ix)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+final.cpt.init
+		; copy code & data for text
+			ld hl,final.put_txt.code_src:ld de,final.put_txt.code
+			ld bc,final.put_txt.code_end-final.put_txt.code_src
+			ldir
+			ld hl,final.data:ld de,final.put_txt.data
+			ld bc,final.put_txt.nb_ch*2*9
+			ldir
+		; gen mask tables
+			ld hl,final.tab_mask
+			; ink0 replaced by dithered ink 1
+			ld b,%11111111
+final.cpt.init.loop0
+			ld a,l
+			rrca:rrca:rrca:rrca:or l:xor b
+			 ld c,a:and %10100000:or l:ld (hl),a:inc h
+			 ld a,c:and %01010000:or l:ld (hl),a:dec h
+			; test sans trame
+			; ld c,a:and %11110000:or l:ld (hl),a:inc h
+			; ld a,c:and %11110000:or l:ld (hl),a:dec h
+			inc l:jr nz,final.cpt.init.loop0
+			;	
+			ld h,(high final.tab_mask)+2		
+			; dithered ink1 replaced by ink 0 ; 1...0... --> 0...0...
+			ld b,%00001111
+final.cpt.init.loop1
+			ld a,l:xor b:add a,a:add a,a:add a,a:add a,a:and l:ld c,a
+			rrca:rrca:rrca:rrca:or c
+			xor -1:and l
+			ld (hl),a
+			inc l:jr nz,final.cpt.init.loop1		
+		; gen tab call
+			ld hl,final.tab_call:xor a
+			ld (hl),a:dec l:jr nz,$-2:inc h
+			ld (hl),a:dec l:jr nz,$-2
+			ld a,high final.line00:ld (final.tab_call+ 0),a:ld a,low final.line00:ld (final.tab_call+#100+ 0),a
+			ld a,high final.line04:ld (final.tab_call+ 4),a:ld a,low final.line04:ld (final.tab_call+#100+ 4),a
+			ld a,high final.line14:ld (final.tab_call+14),a:ld a,low final.line14:ld (final.tab_call+#100+14),a
+			ld a,high final.line18:ld (final.tab_call+18),a:ld a,low final.line18:ld (final.tab_call+#100+18),a
+			ld a,high final.line22:ld (final.tab_call+22),a:ld a,low final.line22:ld (final.tab_call+#100+22),a
+			ld a,high final.line26:ld (final.tab_call+26),a:ld a,low final.line26:ld (final.tab_call+#100+26),a
+			ld hl,final.tab_call:ld de,final.tab_call+31:ld bc,256-31:ldir
+			ld hl,final.tab_call+#100:ld de,final.tab_call+#100+31:ld bc,256-31:ldir
+		; gen code
+			ld hl,final.gen_src
+			ld de,final.gen_adr
+			ld bc,final.gen_src_loop_end-final.gen_src
+			ldir
+			ld hl,final.gen_adr+final.gen_src_loop-final.gen_src
+			ld bc,(final.gen_src_loop_end-final.gen_src_loop)*(11-1)-1 ; -1 loop, - "add hl,bc"
+			ldir
+			ld hl,final.gen_src_loop_end
+			ld bc,final.gen_src_end-final.gen_src_loop_end
+			ldir
+			ld hl,final.gen_adr
+			ld de,final.gen_adr+#80
+			ld bc,final.gen_src_loop-final.gen_src+(final.gen_src_loop_end-final.gen_src_loop)*(11-1)-1
+			ldir
+			ld hl,final.gen_src_loop_end
+			ld bc,final.gen_src_end-final.gen_src_loop_end
+			ldir
+		; gen tab adr scr
+		; 1st screen
+ 			ld de,#4000+32
+			call final.cpt.init.tab_adr_scr
+		; 2nd screen
+			ld a,13:ld (final.cpt+1),a
+			ld a,(21-3)*8
+			ld (final.cpt.fix_nb_lines+1),a
+			ld de,#8000
+			ld c,21-3
+			ld l,(21-3)*8
+			call final.cpt.init.loop2b
+			call final.cpt.init.loop2c-2
+ 			; 8-Bit screen			
+			ld a,#C3:ld (final.cpt.fix_bank+2),a
+			ld a,17:ld (final.cpt+1),a
+			; 1ère partie juste 3 lignes de caractères
+			ld de,#8020+(21-3)*96
+			ld a,(21+3)*8
+			ld (final.cpt.fix_nb_lines+1),a
+			ld l,a
+			ld c,3
+			call final.cpt.init.loop2b
+			; 2nde partie dans une bank complète
+			ld de,#4000
+			ld c,21
+			call final.cpt.init.loop2b
+ if cond.colorz
+			ld hl,#4000+5*96
+			call final.colorz.show
+			ld a,(8)*8
+			ld (final.cpt.fix_nb_lines+1),a
+			call final.cpt.init.loop2c-2 
+			ld a,(21+3)*8
+			ld (final.cpt.fix_nb_lines+1),a
+			ret
+ else
+			jr final.cpt.init.loop2c-2 ; draw!
+ endif
+final.cpt.init.tab_adr_scr ; input = DE adr screen
+			ld c,21
+			ld l,21*8
+			call final.cpt.init.loop2b
+		; ... but also draw! :)
+			ld b,22
+final.cpt.init.loop2c	push bc
+			call final.cpt
+			pop bc
+			djnz final.cpt.init.loop2c	
+		ret
+final.cpt.init.loop2b
+			ld b,8
+final.cpt.init.loop2a
+				ld h,high final.tab_adr_scr
+				ld (hl),e:inc h:ld (hl),d:inc h:ld (hl),high final.tab_mask
+				bit 0,l:jr z,2+$+1:inc (hl)
+				dec l
+				ld a,d:add a,%00001000:ld d,a
+				djnz final.cpt.init.loop2a
+			ld a,d:sub %01000000:ld d,a
+			ld a,e:add a,96:ld e,a:jr nc,2+$+1:inc d
+			dec c:jr nz,final.cpt.init.loop2b
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+					  ; prereq
+					  ; ld b,#7F
+					  ; ld de,#C3C2			
+					  ; exx
+					  ; bc =8
+					  ; d = (high final.tab_mask) +0/1/2
+					  ; hl = adr screen #4000+
+final.gen_src					exx
+						ld a,d:ld (sys.7FC1_3),a
+						;di
+						out (c),d ; #7FC3
+						exx
+						push hl
+final.gen_src_loop			ld e,(hl):ld a,(de):ld (hl),a:		add hl,bc
+final.gen_src_loop_end	pop hl
+						inc hl
+						exx
+						ld a,e:ld (sys.7FC1_3),a
+						out (c),e ; #7FC2
+						;ei
+						exx
+						ret		
+final.gen_src_end		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+final.put_call_at_VBL
+			ld a,48:ld (sys.crtcreg1val+1),a
+			ld a,#C9:ld (scroller.inc_offset),a
+		; écran & scroller
+			call scroller.crtc_64kb
+			ld hl,#3400-48:ld de,48*11:ld bc,#0000+22*48-1024:call scroller.set_scr
+		; palette préparée pour la frame suivante (supposée black la frame en cours)
+			ld hl,sys.ink0val
+			inc hl:inc hl
+  			ld (hl),RGB002:inc hl 	; intérieur des lettres
+  			ld (hl),RGB001		; bord des lettres le restera
+			xor a:ld (scroller.inc_offset),a
+			ld de,final.int.end1:ld bc,21+8+3:jp sys.put_call_at_VBL_wo_call
+final.int.end1
+		; nouveau format d'écran
+			ld hl,inter.line_00_2.final:ld (inter.scroller_final_fix+1),hl ; plus de scroll à l'ancienne
+			ld hl,inter.line_06_6.final:ld (inter.line_06_6.gameboy_fix+1),hl:ld a,l:ld (sys.wait_int_vbl_is_over_djnz+1),a
+										ld (inter.which_int+1),hl
+			ld hl,inter.line_13_2.final:ld (inter.line_13_2.gameboy_fix+1),hl
+			ld hl,inter.line_19_6.final:ld (inter.line_19_6.gameboy_fix+1),hl
+			ld hl,inter.line_26_2.final:ld (inter.line_26_2.gameboy_fix+1),hl
+			ld hl,inter.line_32_6.final:ld (inter.line_32_6.gameboy_fix+1),hl
+		ret
+final.int.flash		ld hl,final.int.flash.tab
+			ld a,(hl)
+			inc hl
+			ld (final.int.flash+1),hl
+			ld (sys.ink1val),a
+		ret
+final.int.flash.tab	db RGB100,RGB200,RGB210,RGB220,RGB222,RGB220,RGB210,RGB200
+final.int.flash_ends
+;			ld hl,final.put_txt.code:ld de,final.xor_pt_init:ld bc,timing_txt_final_speed*(final.put_txt.nb_ch+1)-1:jp sys.put_call_at_VBL
+			ld hl,final.put_txt.code:ld bc,timing_txt_final_speed*(final.put_txt.nb_ch+1)-1:jp sys.put_call_at_VBL_wo_last
+		ret
+; final.xor_pt_init
+; 			ld hl,final.xor_pt:ld de,sys_ret:ld bc,-1:jp sys.put_call_at_VBL
+; 		ret		
+final.put_txt.code_src
+					phase final.put_txt.code
+final.put_txt.cpt
+					ld a,0:inc a:cp timing_txt_final_speed:jr nz,2+$+1:xor a:ld (final.put_txt.cpt+1),a
+					ret nz
+					ld bc,#7FC3:out (c),c ; incompatible avec interruption
+					call final.put_txt.adr_scr
+					ld bc,#7FC2:out (c),c ; incompatible avec interruption
+					ret
+
+final.put_txt.adr_scr
+					ld hl,final.put_txt.adr_scr0-2
+					inc hl:inc hl:ld (final.put_txt.adr_scr+1),hl
+final.put_txt.adr_data
+					ld de,final.put_txt.data-1
+					call final.put_txt.call2
+					ld (final.put_txt.adr_data+1),de
+					ret
+final.put_txt.call2
+					call final.put_txt.loop0
+					ld bc,#C000+96:add hl,bc
+final.put_txt.loop0
+					call final.put_txt.call1
+					dec hl
+					ld a,h:add a,8:ld h,a
+					bit 7,h:jr z,final.put_txt.loop0
+					ret
+final.put_txt.call1
+					inc de
+					ld b,%11110000:call final.put_txt.call0
+					ld b,%00001111:inc hl
+final.put_txt.call0
+					ld a,(de):and b
+					rrca:rrca:rrca:rrca:ld c,a
+					ld a,(de):and b
+					or c
+					or (hl):ld (hl),a
+					ret
+					dephase
+final.put_txt.code_end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.48n32 ; dh=0
+ 		dw 96,192,-32
+ 		db 0 : dw 0 
+		db 0,0 : dw 0
+ 		dw 4096
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ddz=12
+ddx=10
+ddy=15
+dey=4; >0
+ 	macro fface nface,dface
+		defb nface,nface+dface,((nface+1) mod dface)+dface,(nface+1) mod dface,#82
+ 	endm
+final.tab_pts.8_a
+			; 0..15
+				db  ddz,ddx*(-1),ddy*(-4)+dey
+				db  ddz,ddx*(-2),ddy*(-4)+dey
+				db  ddz,ddx*(-2),ddy*(-3)+dey
+				db  ddz,ddx*(-3),ddy*(-3)+dey
+				db  ddz,ddx*(-3),ddy*(-1)+dey
+				db  ddz,ddx*(-2),ddy*(-1)+dey
+				db  ddz,ddx*(-2),ddy*( 0)+dey
+				db  ddz,ddx*(-3),ddy*( 0)+dey
+				db  ddz,ddx*(-3),ddy*( 2)+dey
+				db  ddz,ddx*(-2),ddy*( 2)+dey
+				db  ddz,ddx*(-2),ddy*( 3)+dey
+				db  ddz,ddx*(-1),ddy*( 3)+dey
+				db  ddz,ddx*(-1),ddy*( 2)+dey
+				db  ddz,ddx*(-1),ddy*( 0)+dey
+				db  ddz,ddx*(-1),ddy*(-1)+dey
+				db  ddz,ddx*(-1),ddy*(-3)+dey
+			; 16..31
+				db -ddz,ddx*(-1),ddy*(-4)+dey
+				db -ddz,ddx*(-2),ddy*(-4)+dey
+				db -ddz,ddx*(-2),ddy*(-3)+dey
+				db -ddz,ddx*(-3),ddy*(-3)+dey
+				db -ddz,ddx*(-3),ddy*(-1)+dey
+				db -ddz,ddx*(-2),ddy*(-1)+dey
+				db -ddz,ddx*(-2),ddy*( 0)+dey
+				db -ddz,ddx*(-3),ddy*( 0)+dey
+				db -ddz,ddx*(-3),ddy*( 2)+dey
+				db -ddz,ddx*(-2),ddy*( 2)+dey
+				db -ddz,ddx*(-2),ddy*( 3)+dey
+				db -ddz,ddx*(-1),ddy*( 3)+dey
+				db -ddz,ddx*(-1),ddy*( 2)+dey
+				db -ddz,ddx*(-1),ddy*( 0)+dey
+				db -ddz,ddx*(-1),ddy*(-1)+dey
+				db -ddz,ddx*(-1),ddy*(-3)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,#81
+  	 				fface 0,16
+  	 				fface 2,16
+;  	 				fface 4,16
+  	 				fface 6,16
+;  	 				fface 8,16
+;  	 				fface 10,16
+  	 				fface 12,16
+  	 				fface 14,16
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.8B_b
+			; 0..11
+				db  ddz,ddx*( 1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*(-3)+dey
+				db  ddz,ddx*( 1),ddy*(-3)+dey
+				db  ddz,ddx*( 1),ddy*(-1)+dey
+				db  ddz,ddx*(-1),ddy*(-1)+dey
+				db  ddz,ddx*(-1),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 2)+dey
+				db  ddz,ddx*(-1),ddy*( 2)+dey
+				db  ddz,ddx*(-1),ddy*( 3)+dey
+				db  ddz,ddx*( 1),ddy*( 3)+dey
+			; 12..23
+				db -ddz,ddx*( 1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*(-3)+dey
+				db -ddz,ddx*( 1),ddy*(-3)+dey
+				db -ddz,ddx*( 1),ddy*(-1)+dey
+				db -ddz,ddx*(-1),ddy*(-1)+dey
+				db -ddz,ddx*(-1),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 2)+dey
+				db -ddz,ddx*(-1),ddy*( 2)+dey
+				db -ddz,ddx*(-1),ddy*( 3)+dey
+				db -ddz,ddx*( 1),ddy*( 3)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,#81
+					db 4,5,6,7,#81
+					db 8,9,10,11,#81
+  	 				fface 0,12
+;  	 				fface 2,12
+  	 				fface 4,12
+;  	 				fface 6,12
+  	 				fface 8,12
+;  	 				fface 10,12
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+final.tab_pts.8B_c
+			; 0..15
+				db  ddz,ddx*( 2),ddy*(-4)+dey
+				db  ddz,ddx*( 1),ddy*(-4)+dey
+				db  ddz,ddx*( 1),ddy*(-3)+dey
+				db  ddz,ddx*( 1),ddy*(-1)+dey
+				db  ddz,ddx*( 1),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 2)+dey
+				db  ddz,ddx*( 1),ddy*( 3)+dey
+				db  ddz,ddx*( 2),ddy*( 3)+dey
+				db  ddz,ddx*( 2),ddy*( 2)+dey
+				db  ddz,ddx*( 3),ddy*( 2)+dey
+				db  ddz,ddx*( 3),ddy*( 0)+dey
+				db  ddz,ddx*( 2),ddy*( 0)+dey
+				db  ddz,ddx*( 2),ddy*(-1)+dey
+				db  ddz,ddx*( 3),ddy*(-1)+dey
+				db  ddz,ddx*( 3),ddy*(-3)+dey
+				db  ddz,ddx*( 2),ddy*(-3)+dey
+			; 16..31
+				db -ddz,ddx*( 2),ddy*(-4)+dey
+				db -ddz,ddx*( 1),ddy*(-4)+dey
+				db -ddz,ddx*( 1),ddy*(-3)+dey
+				db -ddz,ddx*( 1),ddy*(-1)+dey
+				db -ddz,ddx*( 1),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 2)+dey
+				db -ddz,ddx*( 1),ddy*( 3)+dey
+				db -ddz,ddx*( 2),ddy*( 3)+dey
+				db -ddz,ddx*( 2),ddy*( 2)+dey
+				db -ddz,ddx*( 3),ddy*( 2)+dey
+				db -ddz,ddx*( 3),ddy*( 0)+dey
+				db -ddz,ddx*( 2),ddy*( 0)+dey
+				db -ddz,ddx*( 2),ddy*(-1)+dey
+				db -ddz,ddx*( 3),ddy*(-1)+dey
+				db -ddz,ddx*( 3),ddy*(-3)+dey
+				db -ddz,ddx*( 2),ddy*(-3)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,#81
+  	 				fface 0,16
+  	 				fface 6,16
+  	 				fface 7,16
+  	 				fface 8,16
+  	 				fface 9,16
+  	 				fface 10,16
+  	 				fface 11,16
+  	 				fface 12,16
+  	 				fface 13,16
+  	 				fface 14,16
+  	 				fface 15,16
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.B_a
+			; 0..7
+				db  ddz,ddx*(-1),ddy*(-4)+dey
+				db  ddz,ddx*(-3),ddy*(-4)+dey
+				db  ddz,ddx*(-3),ddy*( 3)+dey
+				db  ddz,ddx*(-1),ddy*( 3)+dey
+				db  ddz,ddx*(-1),ddy*( 2)+dey
+				db  ddz,ddx*(-1),ddy*( 0)+dey
+				db  ddz,ddx*(-1),ddy*(-1)+dey
+				db  ddz,ddx*(-1),ddy*(-3)+dey
+			; 8..15
+				db -ddz,ddx*(-1),ddy*(-4)+dey
+				db -ddz,ddx*(-3),ddy*(-4)+dey
+				db -ddz,ddx*(-3),ddy*( 3)+dey
+				db -ddz,ddx*(-1),ddy*( 3)+dey
+				db -ddz,ddx*(-1),ddy*( 2)+dey
+				db -ddz,ddx*(-1),ddy*( 0)+dey
+				db -ddz,ddx*(-1),ddy*(-1)+dey
+				db -ddz,ddx*(-1),ddy*(-3)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,4,5,6,7,#81
+ 	 				fface 0,8
+; 	 				fface 2,8
+ 	 				fface 4,8
+ 	 				fface 6,8
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.I_
+			; 0..7
+				db  ddz,ddx*( 1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 1)+dey
+				db  ddz,ddx*(-1),ddy*( 1)+dey
+				db  ddz,ddx*(-1),ddy*( 2)+dey
+				db  ddz,ddx*( 1),ddy*( 2)+dey
+			; 8..15
+				db -ddz,ddx*( 1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 1)+dey
+				db -ddz,ddx*(-1),ddy*( 1)+dey
+				db -ddz,ddx*(-1),ddy*( 2)+dey
+				db -ddz,ddx*( 1),ddy*( 2)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,#81
+					db 4,5,6,7,#81
+ 	 				fface 0,8
+; 	 				fface 2,8
+ 	 				;fface 3,8
+					defb 3,11,8,0,#82
+ 	 				fface 4,8
+; 	 				fface 6,8
+ 	 				;fface 7,8
+ 	 				defb 7,15,12,4,#82
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.T_a
+			; 0..5
+				db  ddz,ddx*( 1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*(-4)+dey
+				db  ddz,ddx*(-1),ddy*( 3)+dey
+				db  ddz,ddx*( 1),ddy*( 3)+dey
+				db  ddz,ddx*( 1),ddy*( 1)+dey
+				db  ddz,ddx*( 1),ddy*( 0)+dey
+			; 6..11
+				db -ddz,ddx*( 1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*(-4)+dey
+				db -ddz,ddx*(-1),ddy*( 3)+dey
+				db -ddz,ddx*( 1),ddy*( 3)+dey
+				db -ddz,ddx*( 1),ddy*( 1)+dey
+				db -ddz,ddx*( 1),ddy*( 0)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,4,5,#81
+ 	 				fface 0,6
+;	 				fface 2,6
+ 	 				fface 3,6
+ 	 				;fface 5,6
+ 	 				defb 5,11,6,0,#82
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.T_b
+			; 0..3
+				db  ddz,ddx*( 1),ddy*( 1)+dey
+				db  ddz,ddx*( 3),ddy*( 1)+dey
+				db  ddz,ddx*( 3),ddy*( 0)+dey
+				db  ddz,ddx*( 1),ddy*( 0)+dey
+			; 4..7
+				db -ddz,ddx*( 1),ddy*( 1)+dey
+				db -ddz,ddx*( 3),ddy*( 1)+dey
+				db -ddz,ddx*( 3),ddy*( 0)+dey
+				db -ddz,ddx*( 1),ddy*( 0)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,#81
+; 	 				fface 0,4
+ 	 				fface 1,4
+ 	 				fface 2,4
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;
+final.tab_pts.pt_
+			; 0..3
+				db  ddz,ddx*( 0),ddy*( 0)+dey
+				db  ddz,ddx*( 2)+1*0,ddy*( 0)+dey
+				db  ddz,ddx*( 2)+1*0,ddy*(-1)+dey
+				db  ddz,ddx*( 0),ddy*(-1)+dey
+			; 4..7
+				db -ddz,ddx*( 0),ddy*( 0)+dey
+				db -ddz,ddx*( 2)+1*0,ddy*( 0)+dey
+				db -ddz,ddx*( 2)+1*0,ddy*(-1)+dey
+				db -ddz,ddx*( 0),ddy*(-1)+dey
+		db -1 ; end of pts
+			db 0
+					db 0,1,2,3,#81
+; 	 				fface 0,4
+ 	 				fface 1,4
+ 	 				fface 2,4
+				defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+

@@ -1,0 +1,615 @@
+
+;(antichronologique)
+
+;doyousea_delete
+
+;splitz_ixien
+;splitz_1943
+;splitz_year
+;splitz_since
+;splitz_sea
+;splitz_close
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.proj_backup.to_screen_once ; appelé dans doydousea et doyousea-after
+					; restore pts
+						ld hl,@rot.tab.pts_proj.backup 
+						ld de,@rot.tab.pts_proj
+scroller.proj_backup.to_screen_once.nbpts_x4
+						ld bc,0
+						ldir
+scroller.proj_backup.to_screen_once.wo_restore
+					; update dx dy
+scroller.proj_backup.call_spec	call scroller.proj_backup.call_spec.return
+					; next scroller's offset, plus adding dx px dy py
+						call scroller.calc.wo_rot.wo_call_spec
+					; pts from proj to spr
+						call scroller.calc_to_screen_once.wo_calc
+					; fix pour 1 objet concave
+						xor a:ld (@rot.tab.z_convobj),a
+					; dessine l'objet 3D dans son buffer
+						call @rot.draw_all
+					; afficher le buffer
+scroller.temp_fix
+						call sprite.put_sprite				
+scroller.proj_backup.call_spec.return
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.proj_backup.init ; utilisé dans doyousea et doyousea-after
+					; rotation itself	
+						call @rot.gen.sincos_rot_iso
+					; backup pts
+						ld a,(@rot.nbpts):ld l,a:ld h,0:add hl,hl:add hl,hl
+						ld (scroller.proj_backup.to_screen_once.nbpts_x4+1),hl:ld b,h:ld c,l
+						ld hl,@rot.tab.pts_proj
+						ld de,@rot.tab.pts_proj.backup 
+						ldir
+					; pts from proj to spr (without adding dx px dy py)
+						call @scroller.proj_to_spr.wo_calc
+					; calc. (but then no draw/fill to screen)
+						call @rot.gen.sides_segs_z
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.51n151
+		dw 102,1530,-151
+		db 7
+		dw 95
+		db 1,1
+		dw 17,434
+scroller.51n261
+		dw 102,1632,-261
+		db 0
+		dw 0
+		db 1,0
+		dw 128,251
+scroller.51n401
+		dw 102,1632,-401
+		db 0
+		dw 72
+		db 1,0
+		dw 40,163
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea_delete
+tess_del51
+s_nb=401
+
+
+			ld hl,scroller.51n401
+				call scroller.init
+			ld hl,offset_doyousea_delete ; check this for glitch and to end the delete nicely
+				ld (scroller.o),hl
+			ld hl,tab.pts.del51
+				call @rot.reset.pts_then_object	
+			call scroller.init.default_zeros
+; 			ld hl,0	
+; 				ld (scroller.calc.dxraw),hl
+; 				ld (scroller.calc.dyraw),hl
+; 				ld (rot.ax_16bits),hl
+; 				ld (rot.ay_16bits),hl
+			ld hl,#36
+				ld (rot.mulu),hl
+			ld hl,#800
+				ld (rot.az_16bits),hl
+
+;doyousea.trans_ink equ #F000;@rot.tab.trans_ink 
+;			call sys.wait.no_call_at_VBL
+			;ld b,%00001111 	; 2222   
+			;ld c,%01011010 	; 2121   
+			;ld d,%01011010 	; 2121   
+			ld bc,%0000111101011010:ld d,c
+			ld hl,@rot.tab.trans_ink ;doyousea.trans_ink
+				call @rot.gen.trans_ink.do
+			;ld b,%10100101 	; 1212   
+			;ld c,%10100101 	; 1212   
+			;ld d,%11110000 	; 1111   
+			ld bc,%1010010110100101:ld d,%11110000   
+			;ld hl,@rot.tab.trans_ink+#100;@doyousea.trans_ink+#100
+			inc h
+				call @rot.gen.trans_ink.do
+				
+			call scroller.proj_backup.init
+			
+			ld hl,del51.tab_call
+del151.loop		ld a,(hl):cp -1:jr z,del151.loop_ends
+				ld (@rot.tab.adr_convobj),a
+				inc hl:ld c,(hl):inc hl:ld b,(hl):inc hl
+				push hl:call del51.calculation:pop hl
+				jr del151.loop 			
+del151.loop_ends
+
+			ld b,83:push bc:call scroller.nextstep:pop bc:djnz $-5
+			ld bc,99*#100+#0002:call del51.calculation
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+
+		; come there, all is dithered with ink 1&2
+		
+del151b
+	 		ld a,#54:ld (sys.ink0val),a ;noir!
+			ld a,48:ld (sys.crtcreg1val+1),a
+			ld hl,0:ld de,0:ld bc,#1000:call scroller.set_scr
+			call sys.wait_int_vbl_is_over:call sys.zik_at_6
+			ld hl,lite.fill_xxxx_once:ld bc,48:call sys.put_call_at_VBL_wo_last
+			jp lite.fill_xxxx
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+del51.calculation	
+			ld a,b:ld (del51.to_screen_once.nb+1),a
+			ld hl,rot.tab.segs_inked:ld (hl),c:inc hl:ld (hl),c:inc hl:ld (hl),c:inc hl:ld (hl),c
+del51.to_screen_once
+			call sys.wait_int_vbl_is_over 
+			call scroller.proj_backup.to_screen_once
+del51.to_screen_once.nb
+			ld a,1:dec a:ld (del51.to_screen_once.nb+1),a:jr nz,del51.to_screen_once
+		ret
+del51.tab_call
+	db 0:dw #0402
+	db 1:dw #0401
+	db 1:dw #0402
+	db 1:dw #1A00+#3503
+	db 0:dw #0402
+	db 1:dw #0401
+	db 1:dw #1A00+#3902
+	db 0:dw #0402
+	db 1:dw #1A00+#3D01
+	db 0:dw #0402
+	db 1:dw #0401
+;;;	db 1:dw 129*#100+#0002 ; not all is deleted cos then it scrolls up
+	db 1:dw 219*#100+#0002 ;;;
+	db -1
+
+																					
+tab.pts.del51
+aa = #40
+ab = #3E
+;pts
+				defb  -aa,-ab,0
+				defb  -aa, ab,0
+				defb   aa, ab,0
+				defb   aa,-ab,0
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 0,1,2,3,#80+1			
+				defb -1 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+splitz_misc.precalc_unroll	push hl
+						ld de,splitz.unroll+1
+						call splitz_misc.precalc_unroll.do0
+					pop hl
+					ld de,splitz.unroll+1+(splitz.template.mod2-splitz.template.mod1)
+splitz_misc.precalc_unroll.do0
+					ld b,0
+splitz_misc.precalc_unroll.loop0	
+						ld a,(hl):inc hl
+						cp -1:ret z
+						push de
+							add a,e:ld e,a:jr nc,2+$+1:inc d
+							ld c,(hl):inc hl
+								ldir
+						pop de
+						ld a,e:add a,splitz.template.ends_here-splitz.template:ld e,a:jr nc,2+$+1:inc d
+						jr splitz_misc.precalc_unroll.loop0
+					
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				
+splitz_misc.precalc_tab
+				ld (splitz_misc.precalc_tab.loop1+1),a
+				xor a
+splitz_misc.precalc_tab_shunt
+				ld (de),a:inc de:djnz $-2
+				ld a,(hl)
+splitz_misc.precalc_tab.loop1
+				ld b,2:ld (de),a:inc de:djnz $-2
+				inc hl:ld a,(hl):cp -1:jr nz,splitz_misc.precalc_tab.loop1				
+				ld b,c:xor a:ld (de),a:inc de:djnz $-2
+				ret						
+												
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	FOR DOYOUSEA / 1943
+
+
+splitz_1943.precalc
+				ld a,#44:ld (splitz.ink+3),a
+				ld a,#40:ld (splitz.ink+1),a
+				ld hl,#5256:ld (splitz.inkter+1),hl ; vert vif
+				ld hl,#4B59:ld (splitz.inkbis+1),hl ; vert vif
+				
+			; fixes!
+				call splitz.switch_out_a
+				ld hl,splitz_1943.subcall
+				ld de,splitz.tab+#88+14*8
+				ld bc,#900:call splitz.precalc_and_fix
+				 
+			; splitz.unroll ... MOD!
+				ld hl,splitz_1943.data_unroll
+				ld de,splitz.unroll+2 
+				call splitz_1943.precalc.do0
+				ld hl,splitz_1943.data_unroll
+				ld de,splitz.unroll+2+(splitz.template.mod2-splitz.template.mod1)
+				call splitz_1943.precalc.do0
+												
+			; splitz.tab
+				ld hl,splitz.tab
+				xor a:ld b,#88:ld (hl),a:inc hl:djnz $-2
+				ld a,15:ld b,8:ld (hl),a:inc hl:djnz $-2:dec a:cp 1:jr nz,$-9
+				xor a:ld b,#88+#18:ld (hl),a:inc hl:djnz $-2
+			ret
+
+splitz_1943.div equ 2			
+splitz_1943.subcall
+				ld a,#88/splitz_1943.div+8/splitz_1943.div*14:dec a:ld ($-2),a:jp z,splitz_event.ending
+				ld a,(splitz.tab_adr+4):xor #4F:ld (splitz.tab_adr+4),a				
+				ld hl,(splitz.template.adr_tab+1):defs splitz_1943.div,#2B:ld (splitz.template.adr_tab+1),hl
+				ret
+
+
+			
+e0=#79 ;#ED79=OUT(C),A		
+e1=#49 ;#ED49=OUT(C),C
+e3=#51 ;#ED51=OUT(C),D
+e2=#59 ;#ED59=OUT(C),E
+e5=#61 ;#ED61=OUT(C),H
+e4=#69 ;#ED69=OUT(C),L
+
+splitz_1943.data_unroll 
+		; 	 	e * 11		
+		db  e0,e0,e1,e2,e0,e2,e1,e2,e0,e0,e0 ; hélice tourne...
+		db  e0,e0,e0,e2,e1,e2,e0,e2,e1,e0,e0
+		db  e0,e0,e0,e3,e0,e3,e0,e3,e0,e0,e0
+		db  e3,e3,e3,e4,e3,e1,e3,e4,e3,e3,e3
+		db  e3,e3,e3,e5,e3,e1,e3,e5,e3,e3,e3
+		db  e2,e3,e3,e4,e3,e5,e3,e4,e3,e3,e2
+		db  e0,e2,e3,e4,e3,e4,e3,e4,e3,e2,e0
+		db  e0,e0,e2,e3,e2,e3,e2,e3,e2,e0,e0
+		db  e0,e0,e0,e3,e0,e0,e0,e3,e0,e0,e0
+		db  e0,e0,e2,e3,e2,e0,e2,e3,e2,e0,e0
+		db  e0,e0,e2,e3,e2,e0,e2,e3,e2,e0,e0
+		db  e0,e0,e0,e3,e0,e0,e0,e3,e0,e0,e0
+		db  e0,e0,e2,e4,e2,e2,e2,e4,e2,e0,e0
+		db  e0,e0,e3,e5,e3,e3,e3,e5,e3,e0,e0
+		db  e0,e0,e0,e2,e0,e0,e0,e2,e0,e0,e0
+	db -1
+splitz_1943.precalc.do0
+splitz_1943.precalc.loop0	
+					ld a,(hl):cp -1:ret z
+					ld b,11
+splitz_1943.precalc.loop1	ld a,(hl):ld (de),a:inc hl:inc de:inc de:djnz splitz_1943.precalc.loop1
+					ld a,e:add a,splitz.template.ends_here-splitz.template-11*2:ld e,a:jr nc,2+$+1:inc d
+					jr splitz_1943.precalc.loop0
+splitz.template.1943 ;5
+				exx:nop:ld hl,0
+				
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz_year.precalc
+			; fix before call common precalc
+				ld hl,splitz_year.subcall
+				ld de,splitz.tab_bis+#85
+				ld bc,#903
+					call splitz.precalc_and_fix
+			
+			; splitz.unroll ... MOD!
+				ld hl,splitz_year.data_unroll
+				call splitz_misc.precalc_unroll
+
+			; splitz.tab
+				ld de,splitz.tab_bis
+				ld hl,splitz_year.data_tab
+				ld bc,#8C14
+				ld a,4
+				call splitz_misc.precalc_tab
+				
+			; fix again
+				ld hl,#2929:ld (splitz.unroll+#13*(splitz.template.ends_here-splitz.template)+(#7C-#45)),hl:ld (2+splitz.unroll+#13*(splitz.template.ends_here-splitz.template)+(#7C-#45)),hl
+				ld a,#14:ld (splitz.tab_bis+#90+#B-4),a
+			
+			ret				
+
+					
+splitz_year.data_tab
+	db	1,2,3,4,4,4,4					; 1 
+	db	5,6,7						; 1 & 9
+	db	8,9,10,11,11,12				;     9
+	db	13							;     9 & 8
+	db	14,15,15,14,14,15,15,14		;         8
+	db	16							;         8 & 8
+	db	17,18,18,17,17,18,18,17,19	;             8
+	db -1
+
+splitz_year.data_unroll										
+	db 2,4:		OUT (C),D:OUT (C),A																		; 1 seul
+	db 0,6:		ADD HL,HL:OUT (C),D:INC L:OUT (C),A
+	db 1,5:		OUT (C),D:INC HL:OUT (C),A ; <-- copied to last line for fixing
+	db 0,4:		OUT (C),C:OUT (C),A
+	db 0,11:	OUT (C),C:OUT (C),A:INC HL:OUT (C),C:OUT(C),D:OUT (C),A									; Commun 1 et 9
+	db 0,16:	OUT (C),C:OUT (C),A:INC L:OUT (C),C:INC L:OUT (C),D:INC L:OUT (C),A:ADD HL,HL:ADD HL,HL:ADD HL,HL
+	db 0,12:	OUT (C),C:OUT (C),A:OUT (C),C:OUT (C),A:OUT (C),D:OUT (C),A
+	db 4,8:		OUT (C),C:OUT (C),A:OUT (C),D:OUT (C),A													; 9 seul
+	db 3,9:		ADD HL,HL:OUT (C),C:INC L:OUT (C),D:INC HL:OUT (C),A
+	db 5,7:		OUT (C),C:OUT (C),D:INC HL:OUT (C),A
+	db 8,4:		OUT (C),D:OUT (C),A
+	db 3,10:	ADD HL,HL:OUT (C),C:INC L:OUT (C),D:INC L:OUT (C),A:ADD HL,HL
+	db 5,12:	OUT (C),C:OUT (C),D:OUT (C),A:OUT (C),C:OUT (C),D:OUT (C),A								; 9 et 1er 8
+	db 9,10:	ADD HL,HL:OUT (C),C:INC L:OUT(C),D:INC L:OUT (C),A:ADD HL,HL							; 1er 8
+	db 10,8:	OUT (C),C:OUT (C),A:OUT (C),D:OUT (C),A
+	db 11,12:	OUT (C),C:OUT (C),D:OUT (C),A:OUT (C),C:OUT (C),D:OUT (C),A								; 8 communs
+	db 12,12:	ADD HL,HL:ADD HL,HL:ADD HL,HL:OUT (C),C:INC L:OUT (C),D:INC L:OUT (C),A:INC L			; dernier 8
+	db 16,8:	OUT (C),C:OUT (C),A:OUT (C),D:OUT (C),A
+	db 17,6:	OUT (C),C:OUT (C),D:OUT (C),A
+	db 1,5:		OUT (C),D:INC HL:OUT (C),A
+	db -1							; ADD HL,HL : ADD HL,HL : ADD HL,HL : ADD HL,HL bien placé dans la 2nde ligne
+
+splitz_year.subcall
+splitz_year.sin1
+				ld a,-6:inc a:ld ($-2),a
+splitz_year.sin1_fix
+				cp #86:jp z,splitz_event.ending
+				call @sys.sinus_16384 ; de #0000 à #4000
+				add hl,hl ; de #00 à #80
+				ld a,#12;#8+2
+				add a,h
+				ld (splitz.template.adr_tab+1),a
+				ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz_since.precalc
+				ld a,#44:ld (splitz.ink+3),a
+				ld a,RGB020:ld (splitz.ink+1),a:ld (splitz.inkter+2),a
+				
+			; fix before call common precalc
+				call splitz.switch_inc_hl
+				ld hl,splitz_since.subcall
+				ld de,splitz.tab_bis
+				ld bc,#900
+					call splitz.precalc_and_fix
+				
+			; splitz.unroll ... MOD!
+				ld hl,splitz_since.data_unroll
+				call splitz_misc.precalc_unroll
+
+			; splitz.tab
+				ld de,splitz.tab_bis
+				ld hl,splitz_since.data_tab
+				ld bc,#8840
+				;ld a,2
+				jp splitz_misc.precalc_tab_shunt-1
+		
+splitz_since.subcall
+				ld a,-3:inc a:ld ($-2),a
+				cp #83:jp z,splitz_event.ending	
+				call @sys.sinus_16384 ; de #0000 à #4000
+				add hl,hl ; de #00 à #80
+				ld a,#8
+				add a,h
+				ld (splitz.template.adr_tab+1),a
+				ret
+
+							
+splitz_since.data_tab
+	db	 1, 2, 3, 3, 3, 4, 5, 6, 6, 6, 7, 4, 0 ; S
+	db	 8, 8, 8, 0, 0, 8, 8, 8, 8, 8, 9,10, 0 ; I
+	db	11,12,13,14,14,14,14,14,14,14,15,16, 0 ; N
+	db	17,18,19,20,20,20,20,20,20,19,18,17, 0 ; C
+	db	21,22,23,23,23,24,25,26,26,27,22,21    ; E
+	db -1
+
+splitz_since.data_unroll
+	; S										
+	db 1,5:		OUT(C),C:INC HL:OUT(C),A
+	db 0,6:		INC L:OUT(C),C:ADD HL,HL:OUT(C),A
+	db 0,4:		OUT(C),C:OUT(C),A
+	db 0,7:		INC L:OUT(C),C:INC HL:OUT(C),A:ADD HL,HL
+	db 1,5:		OUT(C),C:INC HL:OUT(C),A
+	db 2,6:		INC L:OUT(C),C:OUT(C),A:ADD HL,HL
+	db 0,6:		OUT(C),C:INC HL:INC HL:OUT(C),A
+	; I
+	db 4,6:		INC L:OUT(C),C:OUT(C),A:ADD HL,HL
+	db 3,6:		ADD HL,HL:OUT(C),C:INC L:OUT(C),A
+	db 5,4:		OUT(C),C:OUT(C),A
+	; N
+	db 6,9:		ADD HL,HL:OUT(C),C:INC HL:INC HL:INC HL:OUT(C),A:INC L
+	db 6,9:		ADD HL,HL:OUT(C),C:INC HL:INC HL:INC HL:INC L:OUT(C),A
+	db 6,10:	ADD HL,HL:OUT(C),C:INC HL:INC HL:INC HL:INC HL:OUT(C),A:INC L
+	db 6,10:	ADD HL,HL:OUT(C),C:OUT(C),A:OUT(C),C:OUT(C),A:INC L
+	db 6,10:	ADD HL,HL:OUT(C),C:OUT(C),A:OUT(C),C:INC L:OUT(C),A
+	db 6,10:	ADD HL,HL:OUT(C),C:OUT(C),A:INC L:OUT(C),C:OUT(C),A
+	; C
+	db 14,5:	OUT(C),C:INC HL:OUT(C),A
+	db 12,8:	ADD HL,HL	:OUT(C),C:INC HL:INC HL:OUT(C),A:INC L
+	db 13,6:	OUT(C),C:INC L:OUT(C),A:ADD HL,HL
+	db 13,4:	OUT(C),C:OUT(C),A
+	; E
+	db 18,5:	OUT(C),C:INC HL:OUT(C),A
+	db 16,8:	ADD HL,HL:OUT(C),C:INC HL:INC HL:OUT(C),A:INC L
+	db 17,7:	OUT(C),C:INC HL:INC HL:INC HL:OUT(C),A
+	db 17,7:	OUT(C),C:INC HL:ADD HL,HL:OUT(C),A:INC L
+	db 17,6:	OUT(C),C:INC HL:INC HL:OUT(C),A
+	db 17,4:	OUT(C),C:OUT(C),A
+	db 17,6:	OUT(C),C:INC L:OUT(C),A:ADD HL,HL
+	;
+	db -1
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	FOR DOYOUSEA / SEA
+	
+splitz_sea.precalc
+				call splitz_close.precalc
+			; everything the same except
+				ld hl,splitz.tab+#88-#1C-#1C+7+#20:ld (splitz_close.adr_hl),hl
+				ld hl,splitz_sea.subcall:ld (splitz.subcall+1),hl
+				ld a,5:ld (splitz.tab+#1C+#20),a ; changement plus tôt
+				ld hl,splitz.tab+#20:ld (splitz.template.adr_tab+1),hl
+			ret
+
+splitz_sea
+				;retour au split!
+;inter.line_06_6	ld bc,#BC04:out(c),c:ld bc,#BD0A:out (c),c
+;inter.line_32_6	ld bc,#BC04:out(c),c:ld bc,#BD10:out (c),c
+					;call sys.wait_int_vbl_is_over ne marche pas
+				ld b,#F5:in a,(c):rra:jr nc,$-3
+				halt
+				ld hl,(doyousea_large.call_int+1)
+				ld de,51*(16-7)
+				call scroller.add_hl_de
+				ld (scroller.int1+1),hl
+				call doyousea_large.call_int
+				ld hl,(doyousea_large.call_int+1)
+				ld de,51*15
+				call scroller.add_hl_de
+			push hl
+				ld hl,51*16:ld (scroller.inc_scr+1),hl ; scroll activé
+				xor a:ld (sys.nb_calls_at_VBL+1),a
+				
+				halt:halt
+				; normalement, #C visibles pour #10+1 caractères
+				; ca sera que 5 visible, 7 de moins
+				ld bc,#BC04:out(c),c:ld bc,#BD00+20-1 -5:out (c),c
+			pop hl:call scroller.out_hl
+				halt:halt:ld b,0:djnz $
+				ld bc,#BC04:out(c),c:ld bc,#BD10:out (c),c
+				ld bc,#BC07:out(c),c:ld bc,#BD0D:out (c),c
+				ld bc,#BC06:out(c),c:ld bc,#BD05:out (c),c
+				halt				
+				xor a:ld (inter.vbl_only+1),a ; pour retour après splitz, ça sera fait
+				;
+				jp splitz_shunt
+				
+				
+splitz_sea.subcall
+				ld a,timing_sea_black
+				or a:jr z,2+$+5:dec a:ld ($-5),a:ret
+splitz_close.adr_hl equ $+1
+				ld hl,splitz.tab+#1F+#20:dec hl:dec hl:ld (splitz_close.adr_hl),hl
+				ld hl,(splitz.template.adr_tab+1):inc hl:ld (splitz.template.adr_tab+1),hl
+				ld a,l:cp low (splitz.tab+#1C+#20)
+				ret nz
+				jp splitz_event.ending	
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+				
+doyousea_large.call_int
+		ld hl,#3000 ; offset
+doyousea_large.call_int.incr
+		ld de,51*16
+		call scroller.add_hl_de
+		ld (doyousea_large.call_int+1),hl
+	jp scroller.out_hl
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+splitz_close.precalc
+				if cond.colorz
+				ld a,#40:ld (splitz.ink+1),a
+				else
+				ld a,#54:ld (splitz.ink+1),a
+				endif
+				ld a,#44:ld (splitz.ink+3),a
+				
+			; fixes!
+				ld hl,splitz_close.subcall
+				ld de,splitz.tab+#1C+#20
+				ld bc,#603:call splitz.precalc_and_fix
+			
+			; splitz.unroll ... MOD!
+				; #ED,#49 == OUT (C),C
+				; #ED,#61 == OUT (C),H = #55 = ink for pen 1
+				; #ED,#69 == OUT (C),L = 1
+				; #ED,#71 == OUT (C),0
+				; #ED,#79 == OUT (C),A = le fond*
+				;
+			;0	;  àA     |
+			;1	; 1àC 0àC | 1àH 0àA
+			;2	; 1àC 0àC | 1àC 0àC
+			;3	;  àA     | 1àC 0àC
+			;4	; 1àH 0àA |  àA     
+			;5	; 1àH 0àA |  àA     avec changement de l'adresse
+				;
+				ld bc,#6949:ld de,#7149 ; 1àC 0àC 
+				if cond.colorz
+				ld c,#61
+				endif
+				ld hl,splitz.unroll+2+(1-1)*(splitz.template.ends_here-splitz.template)+0*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld hl,splitz.unroll+2+(2-1)*(splitz.template.ends_here-splitz.template)+0*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld hl,splitz.unroll+2+(2-1)*(splitz.template.ends_here-splitz.template)+1*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld hl,splitz.unroll+2+(3-1)*(splitz.template.ends_here-splitz.template)+1*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld c,#61:ld e,#79 ; 1àH 0àA 
+				ld hl,splitz.unroll+2+(1-1)*(splitz.template.ends_here-splitz.template)+1*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld hl,splitz.unroll+2+(4-1)*(splitz.template.ends_here-splitz.template)+0*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				ld hl,splitz.unroll+2+(5-1)*(splitz.template.ends_here-splitz.template)+0*(splitz.template.mod2-splitz.template.mod1):call splitz_close.init0
+				;
+				ld hl,splitz_close.init1
+				ld de,splitz.unroll+(5-1)*(splitz.template.ends_here-splitz.template)+(splitz.template.fix_close-splitz.template)-4 ; == EXX
+				ld bc,5:ldir
+
+			; splitz.tab
+				ld de,splitz.tab
+				ld a,2:ld b,#1C+#20:ld (de),a:inc de:djnz $-2
+				ld a,4:        :ld (de),a:inc de 
+				ld a,5:        :ld (de),a:inc de 
+				ld a,0:ld b,#86:ld (de),a:inc de:djnz $-2
+				ld a,2:ld b,#1D+#20:ld (de),a:inc de:djnz $-2
+				;
+			ret				
+
+splitz_close.init0	ld (hl),b:inc hl:inc hl:ld (hl),c:inc hl:inc hl:ld (hl),d:ld a,9:inc hl:inc hl:ld (hl),e:dec a:jr nz,$-4:ret
+splitz_close.init1	exx:add hl,hl:ld hl,(splitz_close.adr_hl)
+
+
+splitz_close.subcall
+splitz_close.added_tab.cpt
+				ld hl,splitz_close.added_tab
+				ld a,(hl):cp -1:jr z,splitz_close.ends
+				inc hl:ld (splitz_close.added_tab.cpt+1),hl
+				srl a
+				ld bc,#0400:jr nc,2+$+3:ld bc,#0103
+				;
+				ld e,a:ld d,0
+				ld hl,splitz.tab+#1C+#20:or a:sbc hl,de:ld (splitz.template.adr_tab+1),hl
+				ld hl,splitz.tab+#1F+#20:add hl,de:add hl,de:ld (splitz_close.adr_hl),hl
+				;
+				ld a,b:ld (splitz.tab+#1C+#20),a
+				ld a,c:ld (splitz.tab+#1C+2+#86-1+#20),a
+				ret
+				
+				
+splitz_close.ends
+;inter.line_06_6	ld bc,#BC04:out(c),c:ld bc,#BD0A:out (c),c
+;inter.line_32_6	ld bc,#BC04:out(c),c:ld bc,#BD10:out (c),c
+				ld bc,#BC04:out(c),c:ld bc,#BD10+7:out (c),c
+				ld bc,#BC0C:out(c),c:ld bc,#BD30:out (c),c
+				ld bc,#BC0D:out(c),c:ld bc,#BD00:out (c),c
+				ld a,inter.vbl_only_jr-inter.vbl_only-2:ld (inter.vbl_only+1),a
+				ld bc,#7F00:ld hl,#4455:out (c),c:out (c),h:inc c:out (c),c:out (c),l
+				call splitz_event.ending.common
+				halt
+				halt
+				ld bc,#BC04:out(c),c:ld bc,#BD26:out (c),c
+				ld bc,#BC06:out(c),c:ld bc,#BD14:out (c),c
+				ld bc,#BC07:out(c),c:ld bc,#BD1C:out (c),c
+			jp splitz_event.ending+3	
+			
+				
+				
+				
+

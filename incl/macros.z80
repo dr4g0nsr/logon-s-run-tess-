@@ -1,0 +1,86 @@
+		
+ 	macro break
+		db #ED,#FF
+ 	endm
+ 	
+ 	macro unbreak 
+		defs 2,0
+ 	endm
+ 
+	define RGB111 #40
+	define RGB021 #42
+	define RGB221 #43
+	define RGB001 #44
+	define RGB201 #45
+	define RGB011 #46
+	define RGB211 #47
+	define RGB220 #4A
+	define RGB222 #4B
+	define RGB200 #4C
+	define RGB202 #4D 
+	define RGB210 #4E
+	define RGB212 #4F
+	define RGB020 #52
+	define RGB022 #53
+	define RGB000 #54
+	define RGB002 #55
+	define RGB010 #56
+	define RGB012 #57
+	define RGB101 #58
+	define RGB121 #59
+	define RGB120 #5A
+	define RGB122 #5B
+	define RGB100 #5C
+	define RGB102 #5D
+	define RGB110 #5E
+	define RGB112 #5F
+
+	define INK0  RGB000
+	define INK1  RGB001
+	define INK2  RGB002
+	define INK3  RGB100
+	define INK4  RGB101
+	define INK5  RGB102
+	define INK6  RGB200
+	define INK7  RGB201
+	define INK8  RGB202
+	define INK9  RGB010
+	define INK10 RGB011
+	define INK11 RGB012
+	define INK12 RGB110
+	define INK13 RGB111
+	define INK14 RGB112
+	define INK15 RGB210
+	define INK16 RGB211
+	define INK17 RGB212
+	define INK18 RGB020
+	define INK19 RGB021
+	define INK20 RGB022
+	define INK21 RGB120
+	define INK22 RGB121
+	define INK23 RGB122
+	define INK24 RGB220
+	define INK25 RGB221
+	define INK26 RGB222
+	
+	define PM0_0 00000000b
+	define PM0_1 01000000b
+	define PM0_2 00000100b
+	define PM0_3 01000100b
+	define PM0_4 00010000b
+	define PM0_5 01010000b
+	define PM0_6 00010100b
+	define PM0_7 01010100b
+	define PM0_8 00000001b
+	define PM0_9 01000001b
+	define PM0_A 00000101b
+	define PM0_B 01000101b
+	define PM0_C 00010001b
+	define PM0_D 01010001b
+	define PM0_E 00010101b
+	define PM0_F 01010101b
+	
+	define PM1_0 00000000b
+	define PM1_1 00010000b
+	define PM1_2 00000001b
+	define PM1_3 00010001b

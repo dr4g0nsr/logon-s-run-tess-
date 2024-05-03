@@ -1,0 +1,237 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	FINAL  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; final.xor_pt
+; 				ld a,0:inc a:cp timing_pt_final_speed:jr nz,2+$+1:xor a:ld (final.xor_pt+1),a
+; 				ret nz
+; 					ld bc,#7FC3:out (c),c ; incompatible avec interruption
+; 					ld hl,#7FD8:ld a,#11:xor (hl):ld (hl),a
+; 					ld bc,#7FC2:out (c),c ; incompatible avec interruption
+; 				ret
+ if cond.colorz
+final.colorz.show
+			ld a,#C3:call sys.set_7FCx	
+			ld d,8
+final.colorz.show.jr1				
+				push hl
+				ld e,8
+final.colorz.show.jr0
+					push hl
+						ld bc,48*#100+%11110000:ld (hl),c:inc hl:djnz $-2
+						ld bc,48*#100+%00000000:ld (hl),c:inc hl:djnz $-2
+					pop hl
+					ld a,h:add a,8:ld h,a
+					dec e:jr nz,final.colorz.show.jr0	
+				pop hl
+				ld bc,96:add hl,bc
+				dec d:jr nz,final.colorz.show.jr1
+		jp sys.set_7FC2
+ endif
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	MAIN  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+main_entry_7FC2
+
+	if debug.quickstart=1
+	; common for all quickstart: 
+		; set split right now w/o interruption at call
+			ld a,#18:ld (sys.nb_calls_at_VBL+5),a
+			call init_intro.resize_crtc_and_blue_screen
+			call init_intro.activate_splitscreens
+			ld hl,0:ld (sys.nb_calls_at_VBL+1),hl
+			ld a,#28:ld (sys.nb_calls_at_VBL+5),a
+			ld a,adr_spr_fill_normal:ld (@rot.adr_spr_fill),a
+			ld a,adr_spr_draw_normal:ld (@rot.adr_spr_draw),a
+		; unroll
+			call sprite.switch_to_sprite 
+		; then JP at required
+			jp quickstart_jp
+	endif	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	; 1st part until dragonfly is colorz-ed
+			call main_part1
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+	; DEULIGNES = mario, engrenages, rubber (puis letitbig/preca en tâche de fond)
+		; decrunch deulignes
+			if debug.syncbreak=1
+				break
+			endif										
+			ld hl,tessC000.pck
+			ld de,tessC000.bin
+			call exomizer
+			
+	  	; calcul des 3 * 16 Ko tous en 0000 4000 8000 - seul 0000 survivra
+			call deulignes.main_entry
+
+		; init des scripts de changements des 3 splitscreens
+ if cond.colorz=1
+ else
+  	  		ld de,deulignes.script2.init:ld bc,timing_mario_epsilon:call sys.put_call_at_VBL_wo_call 
+ endif
+				  		
+	; LET IT BIG!
+		; decrunch
+			ld hl,tess2C00.pck
+			ld de,#8000:push de
+			ld bc,tess2C00.pck.length
+			ldir 
+			pop hl
+			ld de,tess2C00.bin
+			call exomizer
+ 
+	; init / rot
+		; fix not iso
+			ld hl,@rot.gen.sincos_rot_not_iso:ld (@rot.gen_all+1),hl
+			ld a,3:ld (@rot.gen.pts_rot.mulz+1),a;ld hl,#100:ld (@rot.gen.pts_rot.mulu+1),hl
+			;ld hl,@rot.gen.sincos_rot_iso:ld (@rot.gen_all+1),hl
+		; fix more points and segments
+			; trop de points et trop de segments :(
+				; @rot.tab.pts_proj -> débordera sur @rot.tab.pts_proj.backup inutilisé
+				; @rot.tab.segs -> débordera sur rot.tab.segs sur @rot.tab.segs_inked, déplacé
+				; @rot.tab.segs_inked -> déplacé vers  do_not_cross
+				; @rot.tab.convobj -> déplacé vers  do_not_cross
+			ld hl,#EF40+#00 ; length<#40
+			ld (@rot.tab.segs_inked.fix1),hl:ld (@rot.tab.segs_inked.fix2),hl:ld (@rot.tab.segs_inked.fix3),hl
+			ld hl,#EF40+#40 ; length<#40
+			ld (@rot.tab.convobj.fix1),hl
+ 	 	; init buffer sprite
+			ld a,high letitbig.precalc.sprite.cross:ld (@rot.adr_spr_draw),a
+			ld a,high letitbig.precalc.sprite.gameboy:ld (@rot.adr_spr_fill),a
+			ld c,6:call @rot.reset.size_spr ; 32x32
+			;ld hl,letitbig.precalc.sprite:ld a,#C2:ld de,#4200+%00000000:call sys.fill_xxxx ; vide le buffer
+			ld hl,letitbig.precalc.sprite:ld (hl),0:ld de,letitbig.precalc.sprite+1
+			ld bc,letitbig.precalc.buffer_max-letitbig.precalc.sprite-1:ldir
+					
+ if cond.colorz=1
+ ld hl,#400-5*48:ld (scroller.int1+1),hl 
+ endif
+ 
+ 	; precalc du gameboy
+			call letitbig.gameboy.precalc	
+			if debug.syncbreak=1
+				ld hl,(letitbig.store_sp.next_bank+1)
+				ld de,(letitbig.store_sp.adr+1)
+				break		
+			endif
+			
+ if cond.colorz=1
+ call deulignes.cond_colorz
+ endif			
+			
+	; let it big! proprement dit
+		; rares init résiduels
+			call letitbig.init
+			;call letitbig.decrunch.toscreen.temp_3rd ; faut call letitbig.ymod.init avant <- temporaire
+		; letitbig, enfin						
+		; decrunch la 1ère frame dans un sprite buffer
+			call letitbig.decrunch
+
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			endif
+			call sys.wait.no_call_at_VBL
+		; le recopie à l'écran
+ 			call letitbig.decrunch.toscreen.part_23
+ 		; go!		
+			call letitbig.main 
+			;call letitbig.decrunch.toscreen.part_1
+			;ld hl,32*11:ld (scroller.inc_split+1),hl ; sans réplication des 11 1ères lignes
+			
+
+	; au retour: c'est déjà du 32x32
+		; petit jeu sur la led et l'allumage de la gameboy avec scroll du logo logon
+			ld de,letitbig.after.script0.init:ld bc,timing_gb_before_on:call sys.put_call_at_VBL_wo_call
+		
+				
+ 	if debug.quickstart=1
+quickstart_jp
+		if debug.final=1
+		else
+		; decrunch
+			ld hl,tess2C00.pck
+			ld de,#8000:push de
+			ld bc,tess2C00.pck.length
+			ldir 
+			pop hl
+			ld de,tess2C00.bin
+			call exomizer
+		endif
+			ld a,RGB000:ld hl,sys.ink0val:ld (hl),a:inc hl:ld (hl),a:inc hl:ld (hl),a:inc hl:ld (hl),a
+			ld hl,#0000:ld a,#C3:ld de,#4000+%11110000:call sys.fill_xxxx				
+	endif
+	
+			
+	; final
+	
+		; des trucs faisables en // de la gameboy statique
+		; efface screen 1/2 (les 2 autres qui se suivent pour le scroll-HW des coeurs)
+			ld hl,#4000:ld a,#C3:ld de,#4000+%00000000:call sys.fill_xxxx				
+			ld hl,#4000:ld a,#C1:ld de,letitbig.after.spr_lgn-#4000+%00000000:call sys.fill_xxxx				
+			;...
+			
+		; attente éventuelle ici, faut que le logo soit en bas 
+ 			call sys.wait.no_call_at_VBL
+ 			; attente fixe puis scroll vers la gauche pour effacer
+			if debug.quickstart=1
+			call final.put_call_at_VBL
+			else
+			 	if cond.colorz
+				ld de,letitbig.after.ends4:ld bc,1:call sys.put_call_at_VBL_wo_call
+			 	else
+				ld de,letitbig.after.ends1:ld bc,timing_gb_with_logo:call sys.put_call_at_VBL_wo_call
+				endif
+			endif
+			
+		; efface screen 2/2
+			ld hl,letitbig.after.spr_lgn:ld a,#C1:ld de,#C000-letitbig.after.spr_lgn+%00000000:call sys.fill_xxxx	
+
+		; fix more points and segments
+			; déjà setté par letitbig
+			if debug.quickstart=1
+			ld hl,#EF40+#00 ; length<#40
+			ld (@rot.tab.segs_inked.fix1),hl:ld (@rot.tab.segs_inked.fix2),hl:ld (@rot.tab.segs_inked.fix3),hl
+			ld hl,#EF40+#40 ; length<#40
+			ld (@rot.tab.convobj.fix1),hl
+			endif
+			
+		; fix not iso (car setté par letitbig)
+			;ld hl,@rot.gen.sincos_rot_not_iso:ld (@rot.gen_all+1),hl
+			;ld a,3:ld (@rot.gen.pts_rot.mulz+1),a;ld hl,#100:ld (@rot.gen.pts_rot.mulu+1),hl
+			if debug.quickstart=1
+			else
+			ld hl,@rot.gen.sincos_rot_iso:ld (@rot.gen_all+1),hl
+ 			endif
+ 			
+ 		; 64Kb scroller
+ 			ld hl,rot.tab_7Fadrcrtc:ld(rot.adr_to_tab_7Fadrcrtc),hl 
+ 			ld a,#C3:ld (rot.tab_7Fadrcrtc_C000),a		; dessine le gros 8-Bit
+			call final.precalc
+			
+		; init des scrolls par cpt
+			call final.cpt.init
+						
+		; final du final			
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			endif
+			call sys.wait.no_call_at_VBL ; faut que le scroll du 8-Bit vers le bas soit fini
+			ld hl,final.int.flash:ld de,final.int.flash_ends:ld bc,8:call sys.put_call_at_VBL 
+  			jp final.final_loop
+ 			
+			

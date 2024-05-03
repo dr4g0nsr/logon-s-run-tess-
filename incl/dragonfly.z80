@@ -1,0 +1,514 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.51s61
+ 		dw 102,2345,-61
+ 		db 5
+ 		dw 39
+ 		db -1,2
+ 		dw 22,1074
+; scroller.51s67h
+;  		dw 102,2346,-67
+;  		db 7
+;  		dw 51
+;  		db 1,1
+;  		dw 45,978
+scroller.51s87dy0
+ 		dw 102,2448,-87
+ 		db 0
+ 		dw 0
+ 		db 1,0
+ 		dw 64,753
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly_precalc
+s_nb=61
+s_nbr=10
+		ld hl,#8000:ld (@rot.dx_center_iso+1),hl:ld (@rot.dy_center_iso+1),hl ; nécessaire avant dragonfly_precalc ??
+	; init
+		; global init
+			ld hl,scroller.51s61:call scroller.init
+			ld hl,dragonfly.store_steps:ld bc,s_nbr:call scroller.tabvar.init 
+			ld hl,tab.pts.dragonfly:call @rot.reset.pts
+		; object init
+s_dx = #18
+			ld hl,#0000:ld bc,#10000/s_nb:ld de,s_nbr:ld a,s_dx
+				call scroller.init.sinus_dx
+s_dy = #A
+			ld hl,#0000:ld bc,#10000/s_nb:ld de,s_nbr:ld a,s_dy
+				call scroller.init.sinus_dy
+s_daz = #20
+			ld hl,((#10000/s_nb*s_nbr)*s_nb) mod #10000:ld bc,#10000-#10000/s_nb:ld de,s_nbr:ld a,s_daz
+				call @sys.calc.sinus4.init
+s_day = #30
+			ld hl,#10000-(((#10000/s_nb*s_nbr)*s_nb) mod #10000):ld bc,#10000/s_nb:ld de,s_nbr:ld a,s_day
+				call @sys.calc.sinus3.init
+ 			ld a,#7F:ld (@sys.calc.sinus3.modify+2),a ; fix for #8000 max
+		; az -> now rotation on ax == static
+			ld hl,#4000-#1000:ld (rot.az_16bits),hl
+		; zoom/mulu
+			ld hl,#100:	ld (rot.mulu),hl
+	; precalc pts
+			ld hl,dragonfly.pre_modify:ld (scroller.pre_modify+1),hl
+		; fake 1st call to update required data
+			ld bc,1:call dragonfly_precalc.call_common
+		; then ok let's go
+			ld bc,s_nb:call dragonfly_precalc.call_common
+		; end	
+			ld hl,scroller.modify.return:ld (scroller.pre_modify+1),hl
+ 			ld a,#FF:ld (@sys.calc.sinus3.modify+2),a ; fix for #8000 max
+ 		ret
+dragonfly_presegs
+	; presegs
+		; /!\ pas d'affichage en //, il faut qu'il soit fini						
+			ld hl,tab.pts.dragonfly
+				call @rot.reset.object
+			ld hl,dragonfly.store_segs ; adr store segs inked
+				ld (scroller.precalc_to_draw.store_adr+1),hl
+		; precalc segs inked 1..5
+			ld hl,tab.pts.dragonfly_sides1:call dragonfly.presegs.call_common ; 108000
+			ld hl,tab.pts.dragonfly_sides2:call dragonfly.presegs.call_common ; 239000
+			ld hl,tab.pts.dragonfly_sides3:call dragonfly.presegs.call_common ; 200000
+			ld hl,tab.pts.dragonfly_sides4:call dragonfly.presegs.call_common ; 217000
+			ld hl,tab.pts.dragonfly_sides5:call dragonfly.presegs.call_common ; 217000
+		; nécessaire après dragonfly_precalc ??
+			ld hl,#4000:ld (@rot.dx_center_iso+1),hl:ld (@rot.dy_center_iso+1),hl 
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly_precalc.call_common
+				ld hl,dragonfly.calc ; special call for updating parameters
+				ld de,dragonfly.store_pts ; adr store pts precalc 
+					jp scroller.precalc
+dragonfly.presegs.call_common
+					call @rot.reset.object.sides_only	
+				ld de,dragonfly.store_pts 
+				ld bc,s_nb	; nb of loops
+					jp scroller.presegs.same_adr_store_segs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly
+		; screen as required!!!
+; 			ld hl,51*24-#400+#1000:ld de,51*11
+; 			ld bc,#0045
+; 			; cf debug.colorz_start
+; 				call scroller.set_scr
+		; to screen			
+			ld hl,tab.pts.dragonfly:call @rot.reset.object
+			; to avoid some call...
+				ld hl,dragonfly.store_segs ; adr store segs inked
+					ld (scroller.presegs_to_screen_once.store_adr+1),hl ; adr store segs inked					
+			; to screen	1 = hexagone		
+				ld hl,tab.pts.dragonfly_sides1:call dragonfly.toscreen.call_common
+			; to screen	2 = side of rubber-square		
+				ld b,%11111111 	; 3333
+				;ld c,%11111010  ; 3131
+				ld c,%11110101  ; 3131
+				ld d,c ; anti- glitches / rubber square-bar
+					call @rot.gen.trans_ink
+				ld hl,tab.pts.dragonfly_sides2:call dragonfly.toscreen.call_common
+			; to screen	3 = sides of hexagone		
+				ld b,%00001111 	; 2222
+				ld c,%01011010 	; 2121   
+				ld d,%11111111 	; 3333
+					call @rot.gen.trans_ink
+				ld hl,tab.pts.dragonfly_sides3:call dragonfly.toscreen.call_common
+			; to screen	4 		
+				ld hl,@rot.tab.z_convobj+3:ld (scroller.fix_2convobj+1),hl	
+				ld d,%11111010  ; 3131
+					call @rot.gen.trans_ink
+				ld hl,tab.pts.dragonfly_sides4:call dragonfly.toscreen.call_common
+ 			; to screen	5		
+ 				ld hl,tab.pts.dragonfly_sides5:call dragonfly.toscreen.call_common
+				ld hl,@rot.tab.z_convobj:ld (scroller.fix_2convobj+1),hl	
+			ret
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly.toscreen.call_common
+					call @rot.reset.object.sides_only	
+					call @rot.gen.zfake
+				ld bc,s_nb ; nb of loops
+				ld de,dragonfly.store_pts 
+			jp scroller.presegs_to_screen.wo_call_at_VBL.same_stored_pts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly.calc
+				; dx
+					call scroller.calc.sinus_dx
+				; dy
+					call scroller.calc.sinus_dy
+				; ax -> now rotation on ay == light rihgt then left move
+					call @sys.calc.sinus3
+					or a:sbc hl,de
+						ld (rot.ax_16bits),hl
+				; ay -> now rotation on az == very very little sine
+					call @sys.calc.sinus4
+					ld de,#4000-s_daz*#100/2:add hl,de
+						ld (rot.ay_16bits),hl
+				; p1 p2 adjust
+dragonfly.calc.n_p1_2 ld a,2*7
+					add a,4*s_nbr*2
+					sub s_nb*2
+					jr nc,2+$+2
+						add a,s_nb*2
+					ld (dragonfly.calc.n_p1_2+1),a
+					ld h,high dragonfly.calc.tab_p1_2:add a,low dragonfly.calc.tab_p1_2:jr nc,2+$+1:inc h:ld l,a			
+						ld a,(hl):add a,7:ld (pts.dragonfly.p1a),a:ld (pts.dragonfly.p1d),a:sub 2:ld (pts.dragonfly.p1b),a:ld (pts.dragonfly.p1c),a:inc hl 				
+						ld a,(hl):add a,12:ld (pts.dragonfly.p2a),a:ld (pts.dragonfly.p2d),a:sub 4:ld (pts.dragonfly.p2b),a:ld (pts.dragonfly.p2c),a
+				ret
+dragonfly.calc.tab_p1_2	
+	db -9,-19
+	db -9,-18
+	db -9,-17
+	db -8,-16
+	db -8,-15
+	db -7,-14
+	db -7,-13
+	db -6,-12
+	db -6,-11
+	db -5,-10
+	db -5,-9
+	db -4,-8
+	db -4,-7
+	db -3,-6
+	db -3,-5
+	db -2,-4
+	db -2,-3
+	db -1,-2
+	db -1,-1
+	db 0,0
+	db 0,0
+	db 1,1
+	db 1,1
+	db 2,2
+	db 2,2
+	db 3,3
+	db 3,3
+	db 4,4
+	db 4,4
+	db 5,5
+	db 5,5
+	db 6,6
+	db 6,6
+	db 7,7
+	db 7,7
+	db 7,7
+	db 8,8
+	db 8,8
+	db 8,8
+	db 8,8
+	db 7,8
+	db 6,8
+	db 5,8
+	db 4,8
+	db 3,6
+	db 2,4
+	db 1,2
+	db 0,0
+	db -1,-2
+	db -2,-4
+	db -3,-6
+	db -4,-8
+	db -5,-10
+	db -6,-12
+	db -6,-13
+	db -7,-14
+	db -7,-15
+	db -8,-16
+	db -8,-17
+	db -9,-18
+	db -9,-19
+	;display ($-dragonfly.calc.tab_p1_2)/2 ; ==3D
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly.pre_modify
+s_pt_dest = 0 ; code has been adjusted for this == 0		
+s_pt_nb = 4
+s_pt_src = 4			
+s_pt_dx = #FF40
+s_pt_dy = #1100
+		; proj to buffer
+			ld hl,@rot.tab.pts_proj+4*s_pt_nb
+			ld de,dragonfly.modify.buffer
+			ld bc,4*(dragonfly.nbpts-s_pt_nb)	
+			ldir
+		; dest before update
+			ld hl,@rot.tab.pts_proj+s_pt_nb*4
+			ld de,@rot.tab.pts_proj
+			ld bc,4*s_pt_nb
+			ldir
+		; backup to proj
+			ld hl,dragonfly.modify.backup
+			ld de,@rot.tab.pts_proj+4*s_pt_nb
+			ld bc,4*(dragonfly.nbpts-s_pt_nb)	
+			ldir
+		; buffer to backup
+			ld hl,dragonfly.modify.buffer
+			ld de,dragonfly.modify.backup
+			ld bc,4*(dragonfly.nbpts-s_pt_nb)	
+			ldir
+		; dx
+			ld hl,(scroller.calc.dxraw)
+dragonfly.modify.dxraw.backup	ld de,0
+			ld (scroller.calc.dxraw),de
+			ld (dragonfly.modify.dxraw.backup+1),hl
+			or a:sbc hl,de
+			ld de,s_pt_dx:add hl,de:push hl
+		; dy
+			ld hl,(scroller.calc.dyraw)
+dragonfly.modify.dyraw.backup	ld de,0
+			ld (scroller.calc.dyraw),de
+			ld (dragonfly.modify.dyraw.backup+1),hl
+			ex de,hl
+			or a:sbc hl,de
+			ld de,s_pt_dy:add hl,de:push hl
+		; modifying new
+			pop de:pop bc
+			ld a,s_pt_nb
+			ld hl,@rot.tab.pts_proj
+		jp scroller.modify.add_bcde
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.dragonfly
+		;hexagone
+ax=8 ; z en y maintenant
+ay=8
+aym=16
+az=14
+		; carré tordu
+bx=8 ; en y maintenant;               note : inutile car écrasé
+by=3
+bz=3
+	    ; aile
+axph=4	; attachement sur le corps en haut
+axpl=0	; attachement sur le corps en low
+ayp=1   ; largeur sur le corps
+lyp=8  ; largeur à la pliure 
+lzp=17  ; longueur avant pliure
+lzp2=32 ; longueur après pliure
+lyp2=4  ; largeur en bout d'aile
+lzp3=16	 ; décalage en bout d'aile
+lxp=12  ; hauteur de la pliure de l'aile   : inutile car écrasé
+lxp2=-4 ; hauteur en bout d'aile           : inutile car écrasé
+;pts
+				; 0-7 ex 9-16,17  ;;;;;;;;;;;;;;;;; carré extensible
+				db   ax+bx, by,-bz ; sera écrasé
+				db   ax+bx,-by,-bz ; sera écrasé
+				db   ax+bx,-by, bz ; sera écrasé
+				db   ax+bx, by, bz ; sera écrasé
+				db   ax   , by,-bz
+				db   ax   ,-by,-bz
+				db   ax   ,-by, bz
+				db   ax   , by, bz
+				; 8-15 ex 0-7,8   ;;;;;;;;;;;;;;;;; carré de base... (devenu hexagone)
+				db   ax, ay,-az
+				db   ax,-ay,-az
+				db   ax,-ay, az
+				db   ax, ay, az
+				db  -ax, ay,-az
+				db  -ax,-ay,-az
+				db  -ax,-ay, az
+				db  -ax, ay, az
+				; 16-19 ex 18-21   ;;;;;;;;;;;;;;;;;;;;; suite de l'hexagone, 2 points
+				db   ax,-aym,0
+				db   ax, aym,0
+				db  -ax,-aym,0
+				db  -ax, aym,0
+				; 20-25   ;;;;;;;;;;;;;;;;;;;;; 1ère aile
+				db axph,ayp,az
+pts.dragonfly.p1a	db lxp,lyp,az+lzp
+pts.dragonfly.p2a	db lxp2,lyp2,az+lzp+lzp2
+pts.dragonfly.p2b	db lxp2,-lyp2,az+lzp+lzp2-lzp3
+pts.dragonfly.p1b	db lxp,-lyp,az+lzp
+				db axpl,-ayp,az
+				; 26-31   ;;;;;;;;;;;;;;;;;;;;; 2nde aile
+;cos120=-128/256
+;sin120=222/256
+xxi=ayp
+yyi=az
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+ 				db axpl,xxo,yyo
+xxi=lyp
+yyi=az+lzp
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+pts.dragonfly.p1c	db lxp,xxo,yyo
+xxi=lyp2
+yyi=az+lzp+lzp2-lzp3
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+pts.dragonfly.p2c	db lxp2,xxo,yyo
+xxi=-lyp2
+yyi=az+lzp+lzp2
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+pts.dragonfly.p2d	db lxp2,xxo,yyo
+xxi=-lyp
+yyi=az+lzp
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+pts.dragonfly.p1d	db lxp,xxo,yyo
+xxi=-ayp
+yyi=az
+xxo= high (-128*xxi-222*yyi)
+yyo= high (+222*xxi-128*yyi)
+ 				db axph,xxo,yyo
+		; crete
+; 				db -4,-14,4
+; 				db -4,-10,10
+; 				db 4,-12,7
+ 				db 0,-12,7
+ 		db -1 ; end of pts
+tab.pts.dragonfly.ends
+dragonfly.nbpts equ (tab.pts.dragonfly.ends-tab.pts.dragonfly-1)/3;= 8+(8+4)+2*5
+;sides
+tab.pts.dragonfly_sides1 ;;;;;;;;;;;;;;;;;;;;;;;;;; hexagone, que le dessus
+			db 0
+					db 8,9,16,10,11,17,#80+2
+				db -1 ; -2 pour la trame, -1 sinon
+		db -1
+tab.pts.dragonfly_sides2 ;;;;;;;;;;;;;;;;;;;;;;;;;; face du carré, uniquement les 3 vues
+dpt = 0
+			db 0
+ 					db dpt+1,dpt+5,dpt+6,#80+1			
+ 					db dpt+1,dpt+6,dpt+2,#80+1			
+ 					db dpt+0,dpt+4,dpt+5,#80+2			
+ 					db dpt+0,dpt+5,dpt+1,#80+2			
+ 					db dpt+3,dpt+2,dpt+6,#80+2
+ 					db dpt+3,dpt+6,dpt+7,#80+2
+				db -2
+		db -1 ; end of sides
+tab.pts.dragonfly_sides3 ;;;;;;;;;;;;;;;;;;;;;;;;;; face de l'hexagone, uniquement les 3 vues
+			db 0
+					db 11,10,14,15,#80+2
+					db 16,18,14,10,#80+1			
+					db 9,13,18,16,#80+2			
+;					db 32,33,34,#80+2 ; crête	
+					db 10,16,32,#80+2	
+				db -2 ; -2 pour la trame, -1 sinon 
+		db -1 ; end of sides
+tab.pts.dragonfly_sides4 ;;;;;;;;;;;;;;;;;;;;;;;;;; 1ère aile
+dpt=-2
+			db 0
+					db dpt+22,dpt+23,dpt+26,dpt+27,#80+3
+					db dpt+27,dpt+26,dpt+23,dpt+22,#80+3
+				db -2
+			db 0
+					db dpt+26,dpt+23,dpt+24,dpt+25,#80+3
+					db dpt+26,dpt+25,dpt+24,dpt+23,#80+3
+				db -2
+		db -1
+tab.pts.dragonfly_sides5 ;;;;;;;;;;;;;;;;;;;;;;;;;; 2nde aile
+dpt=4
+			db 0
+					db dpt+22,dpt+23,dpt+26,dpt+27,#80+3
+					db dpt+27,dpt+26,dpt+23,dpt+22,#80+3
+				db -2
+			db 0
+					db dpt+26,dpt+23,dpt+24,dpt+25,#80+3
+					db dpt+26,dpt+25,dpt+24,dpt+23,#80+3
+				db -2
+		db -1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dragonfly_bg_precalc
+;	ld a,#5C:ld (sys.ink0val),a
+s_nb=87
+		; global init
+			ld hl,scroller.51s87dy0
+				call scroller.init
+			ld hl,#1800
+				ld (scroller.o),hl
+			ld hl,tab.pts.dragonfly_bg
+				call @rot.reset.pts;_then_object
+			ld hl,#4000:ld bc,#10000/s_nb:ld de,1:ld a,9:call scroller.init.sinus_dx
+			ld hl,#4000:ld bc,#10000/s_nb:ld de,1:ld a,30:call scroller.init.sinus_dy
+			ld hl,#0800:ld (rot.ay_16bits),hl
+			ld hl,#1000:ld (rot.az_16bits),hl
+			ld hl,  128:ld (rot.mulu),hl
+		; precalc pts
+			ld hl,dragonfly_bg.calc
+			ld de,dragonfly_bg.store_pts
+			ld bc,s_nb
+				call scroller.precalc
+		; presegs
+			ld hl,tab.pts.dragonfly_bg
+				call @rot.reset.object
+			ld hl,dragonfly_bg.store_segs
+			ld de,dragonfly_bg.store_pts 
+			ld bc,s_nb	
+		jp scroller.presegs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;			
+dragonfly_bg
+	; to screen but in background			
+			ld hl,tab.pts.dragonfly_bg
+				call @rot.reset.object
+			call @rot.gen.zfake
+ 			;ld b,%10100000
+ 			ld b,%01010000
+ 			ld c,%11110000
+ 				call @rot.gen.trans_ink
+; 			call sprite.fix.andor.xor_screen
+			ld hl,dragonfly_bg.store_segs
+			ld de,dragonfly_bg.store_pts 
+;;;			ld bc,s_nb
+;;;				call scroller.presegs_to_screen.wo_call_at_VBL
+;;;		ret
+			ld (scroller.presegs_to_screen_once.store_adr.a_input+1),hl ; adr store segs inked					
+			ld (scroller.precalc_to.store_adr.a_input+1),de	            ; adr store pts precalc			
+			ld b,54;s_nb
+dragonfly_bg.loop	push bc
+dragonfly_bg.a_input ld a,-10:add a,10
+					sub s_nb:jr nc,2+$+2:add a,s_nb
+					ld (dragonfly_bg.a_input+1),a
+					call scroller.presegs_to_screen_once.a_input
+					pop bc
+					djnz dragonfly_bg.loop
+				ret
+dragonfly_bg.more	ld b,s_nb-54:jr dragonfly_bg.loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;			
+dragonfly_bg.calc
+s_nb=87
+		; dx/dy
+			call scroller.calc.sinus_dx
+			call scroller.calc.sinus_dy 
+		; rot
+dragonfly_bg.calc.ax	ld hl,#A000
+						ld bc,#10000-#10000/s_nb/2:add hl,bc:ld (dragonfly_bg.calc.ax+1),hl
+						push hl			
+						add hl,hl				
+						call @sys.sinus_16bits
+						pop de
+						add hl,de
+						ld de,#4000:add hl,de
+						ld (rot.ax_16bits),hl
+		ret			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;			
+tab.pts.dragonfly_bg
+aaa = 27
+bbb = 44
+;pts
+				defb  -aaa,-bbb,-bbb
+				defb  -aaa, bbb,-bbb
+				defb   aaa, bbb,-bbb
+				defb   aaa,-bbb,-bbb
+				defb  -aaa,-bbb, bbb
+				defb  -aaa, bbb, bbb
+				defb   aaa, bbb, bbb
+				defb   aaa,-bbb, bbb
+			defb -1 ; end of pts
+;sides
+
+				defb 0 ; which pt for z ordering
+					defb 0,3,2,1,#80+1
+					defb 4,5,6,7,#80+1
+					defb 1,2,6,5,#80+2
+					defb 3,0,4,7,#80+2
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+		
+
+					
+

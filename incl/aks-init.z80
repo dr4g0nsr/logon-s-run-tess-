@@ -1,0 +1,52 @@
+
+aks_init
+
+;DE = Music
+PLY_Init
+	ld hl,9				;Skip Header, SampleChannel, YM Clock (DB*3), and Replay Frequency.
+	add hl,de
+
+	ld de,PLY_Speed + 1
+	ldi				;Copy Speed.
+	ld c,(hl)			;Get Instruments chunk size.
+	inc hl
+	ld b,(hl)
+	inc hl
+	ld (PLY_Track1_InstrumentsTablePT + 1),hl
+	ld (PLY_Track2_InstrumentsTablePT + 1),hl
+	ld (PLY_Track3_InstrumentsTablePT + 1),hl
+
+	add hl,bc			;Skip Instruments to go to the Linker address.
+	;Get the pre-Linker information of the first pattern.
+	ld de,PLY_Height + 1
+	ldi
+	ld de,PLY_Transposition1 + 1
+	ldi
+	ld de,PLY_Transposition2 + 1
+	ldi
+	ld de,PLY_Transposition3 + 1
+	ldi
+	ld de,PLY_SaveSpecialTrack + 1
+	ldi
+	ldi
+	ld (PLY_Linker_PT + 1),hl	;Get the Linker address.
+
+	ld a,1
+	ld (PLY_SpeedCpt + 1),a
+	ld (PLY_HeightCpt + 1),a
+
+	ld a,#ff
+	ld (PLY_PSGReg13),a
+	
+	;Set the Instruments pointers to Instrument 0 data (Header has to be skipped).
+	ld hl,(PLY_Track1_InstrumentsTablePT + 1)
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	ex de,hl
+	inc hl					;Skip Instrument 0 Header.
+	inc hl
+	ld (PLY_Track1_Instrument + 1),hl
+	ld (PLY_Track2_Instrument + 1),hl
+	ld (PLY_Track3_Instrument + 1),hl
+	ret

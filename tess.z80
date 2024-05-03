@@ -1,0 +1,522 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; compilation conditionnelle
+
+cond.sna_E000=1				; 0 nécessaire pour exe final via exo ; 1 pour générer des binaires à inclure dans un snapshot
+cond.colorz=0				; 1 pour une version montrant ce qui ne devrait pas être vu
+
+debug.quickstart=0			; quick start for testing some part at run
+debug.final=0				; inclus l'include du final hors du pack pour une exécution sans depacker en test
+debug.synchro=0				; BREAK conditionnel (dont: dans A le nb de CALLs/VBL résiduels genre flash avant transition
+debug.syncbreak=0			; BREAK judicieux mais systematique (WIP)
+debug.flag_VBL=0			; BREAK s'il y a une int VBL durant si longtemps qu'il y a la suivante
+debug.flag_blankspr=0		; BREAK si jamais on essaye d'afficher un sprite blank (y'aurait erreur qqpart)
+debug.sprite_ready=0		; BREAK au début du put sprite (qui est dessiné donc, vérifiable avant d'aller à l'écran)
+debug.convex_merge=0		; BREAK avant le fill/put d'un sprite d'avant-plan en surimpression d'un sprite d'arrière-plan
+
+obsolete.letitbig=0			; BREAK sur le nb de nop-cycles à rattraper, si +3=12 octets sur une ligne, vérif buffer stockage
+obsolete.store_steps=0		; BREAK en debut et fin de la routine stockant les steps (usage: taille de la data générée)
+obsolete.store_pts=0		; BREAK en debut et fin de la routine stockant les points (usage: taille de la data générée)	
+obsolete.store_segs=0		; BREAK en debut et fin de la routine stockant les segments (usage: taille de la data générée)
+obsolete.logostart=0		; logo de test, mis, enlevé, remis...
+obsolete.colstart=0			; colonne s'élargissant au tout début, très bof
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; timings
+timing_init_intro_basic				equ 100+85	; keep basic screen w/o CLS
+timing_init_intro_blue				equ 50-20	; keep blue screen (incl. blue border)
+timing_init_intro_bar				equ 489-65	; >=489 timing for loading bar /!\ set by debugging
+timing_init_intro_bar_y				equ 18		; nb frames / bar falling from top /!\ centered
+;timing_init_intro_bar_t			equ 107		; (logostart only)
+;timing_init_intro_bar_f			equ 50		; (logostart only)
+timing_delay_cube18					equ 45		; before XL cube is displayed
+timing_before_invader				equ 75		; timing set with much lost cputime - for synchro only :(
+timing_after_invader				equ 25		; with all layers, before it stops - much lost cputime - for synchro only :(
+timing_lgtempo_before				equ 55			; .
+timing_lgtempo_middle				equ 1			; ..
+timing_lgdel						equ 178-55-1	; ... /!\ SUM /!\ set by debugging (?)
+timing_sea_large					equ 243-#90	; /!\ set by debugging (?) - call dragonfly_precalc MOVED
+timing_sea_black					equ 100-20	; boats on black border
+timing_sfx							equ 100		; SFX displayed on screen
+timing_lite_dsk						equ 186		; /!\ set for nice stop-moving hearts
+timing_lite_ghost					equ 62	 	; >=62 set by debug
+timing_colorz						equ 450 	;
+timing_dragonfly_red				equ 305		; nicely set 		
+timing_donkey						equ 100-25		
+timing_mario_epsilon				equ 2+10+5			
+timing_engrenages				 	equ 48*6-20-10+5; .		
+timing_engrenages_mario_rubber		equ 48*6+35		; ..
+timing_rubber						equ 48*7+8-10	; ... /!\ sum!
+timing_transit0						equ 1
+timing_transit_freq_square			equ 24
+timing_gb_before_on					equ 20+30
+timing_gb_with_logo					equ 80+70
+timing_gb_off						equ 20+25
+timing_txt_final_speed				equ 10
+
+
+; misc.
+sprite.unroll_nb 					equ 27
+exomizer							equ #F34A
+offset_logo_at_start				equ #8008+48-7+120*8 ; offset for logo at start (if used)
+crtc_reg3							equ #0C
+
+; synchro/glitches
+offset_gagacubiz 					equ	#0400
+offset_gagacubiz_last_lite			equ	#0004
+offset_doyousea_delete 				equ	#005F
+
+; precalculation of "gagacubiz" = only convex objects
+adr_spr_fill_gagacubiz	equ #D1
+adr_spr_draw_gagacubiz	equ #C0 
+buffer = #8000;#D100 previously
+;length=#3E00
+cube151.store_segs 		equ buffer	-#0F00					; #0F00 
+cube271.store_segs 		equ buffer	-#1100					; #1100
+cube271.store_pts 		equ buffer	-#1100-#1550			; #153C
+cube151.store_pts 		equ buffer	-#1100-#1550-#17B0		; #1798
+;	display cube151.store_pts 
+;#4200;#9400 previously
+;buffer moved to #4000-#7FFF :)
+;code&data before doyousea must be <#D100
+;
+
+; generated for splitz  /!\ empty this before letting next part use this place
+splitz.unroll_nb equ 43  ; en plus du template qui est utilisé aussi			
+splitz.clean_me			equ 	#D000
+splitz.unroll			equ		#D000 
+splitz.tab				equ		#D600
+splitz.preca_invader	equ		#DA00
+splitz.tab_bis			equ		#DA00
+splitz.tab_ter			equ		#DE00
+
+; precalculation of "do you sea"
+adr_spr_fill_doyousea	equ #D4
+adr_spr_draw_doyousea	equ #CC ; required cos' complex object = the boat
+buffer = #D000
+;length=#2600
+square261.store_steps	equ buffer	-#700 					; #061E /// #0A32=261*10
+square261.store_pts 	equ buffer 	-#700-#1100 			; #1050=261*#10
+doyousea401.store_steps equ buffer 	-#700-#1100-#0A00		; #0966 /// #0FAA=401*10
+doyousea.store_steps 	equ buffer 	-#700-#1100-#0A00-#400	; #038A /// #05E6=151*10
+;	display doyousea.store_steps 										
+;#AA00
+;code&data before doyousea could be >#AA00
+;code&data from doyousea must be <#AA00
+
+
+; precalculation of "dragonfly"
+adr_spr_fill_normal	equ #D0
+adr_spr_draw_normal	equ #C0
+buffer = #C000 ; which has been confirmed, despite sprite width=32, search for "; sprites buffer fix"
+;length=#2900
+dragonfly_bg.store_segs equ buffer	-#0414							; #0414
+dragonfly_bg.store_pts 	equ buffer	-#0414-#06CC					; #06CC
+dragonfly.store_steps 	equ buffer	-#0414-#06CC-#016E				; #016E
+dragonfly.store_pts 	equ buffer	-#0414-#06CC-#016E-#10AA		; #10AA
+dragonfly.store_segs 	equ buffer	-#0414-#06CC-#016E-#10AA-#B34	; #0B33
+;	display dragonfly.store_pts 
+;#A240
+;	display dragonfly.store_segs 
+;#97D4 (previously #9700)
+;code&data before "call dragonfly_presegs" could be >#9700
+;code&data from "call dragonfly_presegs" must be <#9700
+;"call dragonfly_presegs" == just after splitz_sea then splitz_sea
+
+
+;		dragonfly
+;#9700
+;		doyousea	length<#1300
+;#AA00
+;		gagacubiz	length<#2700
+;#D100
+;
+; --> org dragonfly tel que dragonfly (suivi de doyouseau+gagacubiz) ne dépasse pas #9700 - décompressé de base
+
+
+; "colorz", once "dragonfly" is drawn = does not need buffers for 3D object/sprite
+buffer = #E000
+colorz_tab_a 			equ buffer-#9A6*1  	; length=9A6
+colorz_tab_b 			equ buffer-#9A6*2  	; length=9A6
+colorz_tab_c 			equ buffer-#9A6*3  	; length=9A6
+;	display colorz_tab_c
+;#C30E
+
+
+; deulignes
+adr_spr_fill_deulignes			equ #D000+#500
+adr_spr_draw_deulignes			equ #C000+#500+#900
+adr_spr_deulignes				equ #D200 ; adresse utile i.e. en dessous c'est utilisable
+deulignes4.mario_sprite 		equ #DA00	; sur #600
+deulignes.data_background_blk	equ #D800	; #200
+
+
+; let it big!
+letitbig.constant.nb_frames		equ #38	; nb boucles total
+letitbig.constant_ymin			equ 8
+letitbig.constant_r4mod			equ 10
+letitbig.constant_r4aks			equ 4
+; 								#7FC0
+letitbig.crtc_offset			equ #3000 
+letitbig.adr_vram				equ #C000 ; #60 i.e. screen width et en +#800 aussi (reg9=1)
+letitbig.code					equ #C700 ; #100(-) /!\ cos out #7FC2 and <#FDFD
+letitbig.eat1stlines.code		equ #C600 ; #100(-) /!\ cos out #7FC2 and <#FDFD
+letitbig.rasters				equ #C500 ; #88 et peut-être #80 à terme
+letitbig.code.copy_buffer		equ #FD00 ; <#FDFD
+; 								#7FC2
+letitbig.precalc.buffer_max 	equ #E000								;letitbig.precalc.buffer+#880
+letitbig.precalc.buffer 		equ letitbig.precalc.buffer_max-#880	;#D700-#780
+letitbig.precalc.sprite 		equ letitbig.precalc.buffer-#4200+#780	;#9500 ; #4200 but last #780 are used as buffer, not required for sprite
+letitbig.precalc.sprite.gameboy	equ letitbig.precalc.sprite-#300		;1st #300 not used
+letitbig.precalc.sprite.cross	equ letitbig.precalc.sprite+#1300+#100	;(...) see dyc_gboy
+letitbig.tab_sp					equ #D600-#4000-#200 ; #9400 "aujourd'hui" 8*n.frames #38*8=#1C0 /// see letitbig.mod.sprite	
+;	display letitbig.tab_sp
+; ymod						   <#E000
+letitbig.mod.unroll				equ #DF00; 5*14+3
+letitbig.mod.tab_l0l1jr	 		equ #DE00; #100
+letitbig.mod.tab_l0l1	 		equ #DD00; #100
+letitbig.mod.tab_conv 			equ #D900; #400
+letitbig.mod.unroll_decrunch	equ #D700; #200
+letitbig.mod.conv_nomask		equ #D600; #100
+letitbig.mod.sprite				equ #D600-#4000
+letitbig.mod.buffer_sp			equ #D600-#880 ; sera recouvert à la fin mais qu'importe :)
+
+
+; LETITBIG after				; laisser #C000-#E000 dispo comme buffer écran pour le final
+letitbig.after.spr_gen			equ #EF00-#800 ; <#800 forcément après la recopie du backup du fond
+letitbig.after.backup_bg_temp	equ #EF00-#600 ; <#600
+letitbig.after.backup_bg		equ #C000-#600 ; <#600	; effaçable dès que le logon est affiché et ne bouge plus
+letitbig.after.spr_msk			equ #C000-#600-#400 ; <#400 
+letitbig.after.spr_lgn			equ #C000-#600-#400-#1000 ; 4*#400
+
+
+; final							; note: écran gameboy en C0:0000
+adr_spr_fill_final				equ #C000 ; pas de convexe?
+adr_spr_draw_final				equ #C000
+adr_spr_final					equ #C000
+final.scroller_o				equ 2048*3-5*96-3*96
+final.tab_mask					equ #C000							; #300
+final.gen_adr					equ #C000+#300 					; <#100
+final.tab_adr_scr				equ #C000+#300+#100				; #300
+final.tab_call					equ #C000+#300+#100+#300		; #200
+final.put_txt.code				equ #C000+#300+#100+#300+#200	; <#100
+final.put_txt.data				equ #C000+#300+#100+#300+#300	; final.put_txt.nb_ch *2*9
+final.put_txt.adr_scr0 			equ #4000+96*19+9+#3800
+final.put_txt.nb_ch 			equ 39
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; code et données, partie basse en 0000/7FC2
+
+		output "output/tess0000.bin"
+			org  #0000
+dollar.temp = $
+				include "incl/macros.z80"
+				assert $=0
+ 				incbin "incbin/deadend.bin"
+				display "[",dollar.temp,"] ",$-dollar.temp," > include AKS song"	
+dollar.temp = $
+				include "incl/aks.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > include AKS player"	
+dollar.temp = $
+				include "incl/sys.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > include SYS"	
+dollar.temp = $
+				include "incl/rot.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > include ROT /code"	
+dollar.temp = $
+				include "incl/scroller.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > include scroller"	
+	if debug.final=1
+dollar.temp = $	
+final.data
+ 				incbin "incbin/fnl.bin" 
+ 				include "incl/final.z80"
+ 				display "[",dollar.temp,"] ",$-dollar.temp," > final"	
+ 	endif
+dollar.temp = $
+tess0000_end 	equ $	
+tess2C00.pck	incbin "output/tess2C00.pck"
+				display "[",dollar.temp,"] ",$-dollar.temp," > tess2C00.pck (let it big)"	
+dollar.temp = $
+tess2C00.pck.length equ $-tess2C00.pck
+tessC000.pck incbin	"output/tessC000.pck"
+				display "[",dollar.temp,"] ",$-dollar.temp," > tessC000.pck (deulignes)"	
+dollar.temp = $
+tessC000.pck.length equ $-tessC000.pck
+				display "[",dollar.temp,"]        > yet available -----------> ",#4000-dollar.temp," <-------"
+				display " "
+			assert $<=#4000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; code et données, 3ème partie 
+
+		output "output/tess2C00.bin"
+			org  #2C00
+	if debug.final=0
+				assert $>tess0000_end
+	endif
+tess2C00.bin
+			
+	if debug.final=0
+dollar.temp = $	
+final.data
+ 				incbin "incbin/fnl.bin" 
+				include "incl/final.z80"
+ 				display "[",dollar.temp,"] ",$-dollar.temp," > final"	
+ 	endif
+dollar.temp = $	
+ 				include "incl/letitbig-after.z80"
+ 				display "[",dollar.temp,"] ",$-dollar.temp," > let it big! - after"	
+dollar.temp = $	
+ 				include "incl/letitbig.z80"
+ 				display "[",dollar.temp,"] ",$-dollar.temp," > let it big!"	
+dollar.temp = $	
+letitbig.lgn_data incbin "incbin/lgn.bin"
+ 				display "[",dollar.temp,"] ",$-dollar.temp," > let it big! - bin for logo"	
+				display "[",dollar.temp,"]        > available ",#4900-dollar.temp," up to #4900"
+				display " "
+			assert $<=#4900
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; code et données, 2nde partie 
+
+		output "output/tessC000.bin"
+			org  #C000
+tessC000.bin
+			
+dollar.temp = $
+				include "incl/deulignes.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > deulignes"	
+dollar.temp = $
+deulignes.data_background_inc 
+				incbin "incbin/deu.bin"
+deulignes4.mario_sprite_src 
+				incbin "incbin/mro.bin"
+				display "[",dollar.temp,"] ",$-dollar.temp," > deulignes (bin)"	
+dollar.temp = $
+				include "incl/dragonfly-after.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > dragonfly - after"	
+dollar.temp = $
+				display " "
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+				display "[",#4000,"] ",#4000," > virtual vram bank"
+				display " "
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; code, partie moyenne en 8000/7FC2
+
+		output "output/tess8000.bin"
+				org  #8000
+				
+
+dollar.temp = $
+				include "incl/colorz.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > colorz"	
+dollar.temp = $
+				include "incl/dragonfly.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > dragonfly"	
+dollar.temp = $
+sprite16k.datatest incbin "incbin/spr.bin"
+				include incl\lite.z80
+				display "[",dollar.temp,"] ",$-dollar.temp," > lite"	
+dollar.temp = $
+				include "incl/splitz.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > splitz"	
+dollar.temp = $
+				include "incl/doyousea-after.z80"
+splitz_close.added_tab
+				incbin "incbin/sin.bin":db -1; which ends
+				display "[",dollar.temp,"] ",$-dollar.temp," > do you sea? - after        ",#97D4-splitz_sea.precalc:assert splitz_sea.precalc<=#97D4 	
+dollar.temp = $
+				include "incl/doyousea.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > do you sea?"	
+dollar.temp = $
+				include "incl/logon.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > logon system" 
+dollar.temp = $
+				include "incl/gagacubiz-after.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > gagacubiz - after          ",#AA00-$:assert $<=#AA00 ; precalc doyousea	
+dollar.temp = $
+				include "incl/gagacubiz.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > gagacubiz                  ",#D100-$:assert $<=#D100 ; buffers...	
+dollar.temp = $				
+				display "[",dollar.temp,"]        > yet available: min val of> ^^^^^^ "
+				display " "
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; code, partie haute en E000/7FC1 ou 7FC2 ou 7FC3
+
+		output "output/tessE000.bin"
+				org  #E000
+dollar.temp = $
+			if cond.sna_E000
+				di:ld sp,sys.stack
+			endif
+			; entrée supposé en 7FC3 (rappel)
+				jp init_intro
+
+				include "incl/7fc1.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > 7FC1 system code"	
+dollar.temp = $
+				include "incl/7fc1-part3.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > main & last calls"	
+dollar.temp = $
+				include "incl/7fc1-part2.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > deulignes&letitbig : calls then purged"	
+dollar.temp = $
+				include "incl/7fc1-part1.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > main&scroller&+: calls then purged"	
+dollar.temp = $
+				include "incl/init.z80"
+				include "incl/aks-init.z80"
+				display "[",dollar.temp,"] ",$-dollar.temp," > INIT code"	
+				
+			if obsolete.logostart		
+dollar.temp = $
+init.gfx_start	incbin start.bin
+				display "[",dollar.temp,"] ",$-dollar.temp," > gfx at start"
+			endif		
+				
+dollar.temp = $
+				display "[",dollar.temp,"] ..."
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+		output "output/dummy"
+		
+				org #F34A-#25F ; =#F0EB
+dollar.temp = $
+
+rot.tab.convobj.1pt		defs #0005,0 ; 1+max.convobj*1,0 ; n* pt, -1 ends
+rot.tab.sides_seen 		defs #000F,0 ; max.sides,0 ; seen if value>0
+rot.tab.adr_convobj		defs #000C,0 ; max.convobj*3,0 ; translation.n°(8bits),adr to rot.tab.convobj
+rot.tab.z_convobj 		defs (rot.tab.sides_seen-rot.tab.convobj.1pt-1)*3+1 ,0 ; 1+rot.max.convobj*3,0 ; flag(8bits),&z(16bits) ... -1 ends
+rot.tab.sides_full	 	defs #008C,0 ; ((rot.tab.sides.ends-rot.tab.sides)+(1+3)*rot.max.sides),0 ; calculation is not accurate? it is
+rot.tab.convobj			defs #0028,0 ; rot.max.convobj+rot.max.segs+rot.max.segs_twice,0 ; for N convobj (list of segments, -1 ends)
+rot.tab.segs  			defs #004F,0 ; 1+((max.segs+max.segs_twice)*2),0 ; n* (pt1->pt2), -1 ends
+rot.tab.segs_inked 		defs (rot.tab.segs_inked-rot.tab.segs-1)/2,0 ; rot.max.segs+rot.max.segs_twice,0 ; which ink (0 is not drawn)
+rot.tab.pts_proj 		defs #0084,0 ; max.pts*4 ; n* (x,y)(16 bits)
+rot.tab.pts_proj.ends	assert (rot.tab.pts_proj.ends-rot.tab.pts_proj)<#3F0
+rot.tab.pts_proj.backup	defs rot.tab.pts_proj.ends-rot.tab.pts_proj,0 ; rot.max.pts*4,0 ; used at 1st call scroller.proj_backup.init
+	
+				display "[",dollar.temp,"] ",$-dollar.temp," > TABles for ROT&SCROLLER (#7FC2 would be ok)"	
+				
+				display "[0xF34A]        > EXOmizer call"	
+				
+						org #F400; #FD00-#100-#100-#100-#400-#200
+				
+dollar.temp = $
+sys.mul.tab				defs #400 		; may be placed lower in memory on 7FC2 only
+rot.tab.xor_fill		defs #100		; see  next line
+rot.tab.mask			defs #100		; cos' of INC H  == rot.tab.xor_fill+#100
+rot.tab.fill			defs #100		;
+rot.tab.trans_ink 		
+sys.conv_vram.tab		;equ rot.tab.trans_ink		; defs #100
+splitz.stack			;equ rot.tab.trans_ink		; moins de #200, i.e. 34*4+2=138
+						defs #100
+sys.conv_vram.gen		;equ rot.tab.trans_ink+#100 	; defs #100	+8-1 /!\ beware it uses also a bit of rot.tab.pts_spr
+						defs #100
+				display "[",dollar.temp,"] ",$-dollar.temp," > TAB inc. (some require 7FC1/3)"	
+rot.tab.pts_spr 		;equ #FD00 ; defs rot.max.pts*2,0 ; n* (x,y)(8 bits)
+splitz.tab_adr			;equ rot.tab.pts_spr 		; des mots (126 max) pour l'adresse des différents code par scanline 
+letitbig.code_FD00
+				display "[0xFD00]        > TAB for n<126 pts () / exo_mapbasebits / JP INT en #FDFD"
+				display "[0xFE00] 0x0102 > IM2"
+				display "[0xFF80] [0xFFC0] [0xFFE0] ...  stack std or if spr width=#40 or #20 or..."
+				
+sys.int.im2_byte 		equ #FD	; #FDFD->...		
+sys.int.im2_base 		equ #FE	; #FE00->FF02
+sys.stack			  	equ #FF80
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				
+do_not_cross				equ #F0EB
+
+; buffer/tab which can use code/date previously used
+
+
+							; used most of the time
+							;
+sprite.unroll				equ	#EFC0 ; #127 si sprite.unroll_nb=27 (décimal)
+sprite.unroll.fix.andor 				equ sprite.unroll+sprite.unroll_nb*10-2-5
+sprite.unroll.ends						equ sprite.unroll+sprite.unroll_nb*10-2		
+sprite.width6							equ sprite.unroll.ends+3
+sprite.ligne.loop.shunt_unroll			equ sprite.unroll.ends+6
+sprite.ligne.faster.jp3 				equ sprite.unroll.ends-6+sprite.switch_to_sprite.data_ends-sprite.switch_to_sprite.data
+							assert sprite.unroll>=dollar.end_init.sprite_unroll
+							;display "sprite.unroll-dollar.end_init.sprite_unroll=",sprite.unroll-dollar.end_init.sprite_unroll
+
+							; used only when logon system logo is deleted
+							;
+lgdel.backup.buffer 		equ #EF00 ; defs 192,0 = #C0		
+
+						
+							; used when pre-calc dragonfly
+							;
+dragonfly.modify.backup 	equ #EF00 ; #88
+dragonfly.modify.buffer 	equ #EF00-#88 ;#88						
+							;assert dragonfly.modify.buffer>=dollar.lg.delete_from_here
+
+	
+							; used when sprite16k are called 
+							;
+lite.scroller_backup		equ #EFC0-#20 ; d19
+lite.sprite_buffer 			equ #EFC0-#20-#210		; 4 * 22*6=#210
+lite.scroller_buffer		equ #EFC0-#20-#210-#138 ; 78x4=#138
+							assert lite.scroller_buffer>=dollar.lite.delete_from_here
+							;display "lite.scroller_buffer-dollar.lite.delete_from_here=",lite.scroller_buffer-dollar.lite.delete_from_here
+
+							
+							; used by deulignes
+							;
+deulignes.scroller.tabvar	equ #EF00-#100
+						
+
+							; used by let it big
+							;
+letitbig.precalc.buff_l0	equ #EF00 ; #40 
+						;            +#40 ; table déplacée pour @rot
+						;            +#80 ; table déplacée pour @rot
+letitbig.precalc.buff_l1	equ #EF00-#100 ; #40; reste #C0=96*2
+letitbig.precalc.ldhl		equ letitbig.precalc.buff_l1+#40 ; 96 * LD(HL),r:INC L	
+letitbig.precalc.mask		equ #EF00-#100-#200 ; 48*2=96 octets = la largeur de l'écran - 2 fois
+							assert letitbig.precalc.mask>=main_part1
+							;display "letitbig.precalc.mask-main_part1=",letitbig.precalc.mask-main_part1
+
+							
+							; used by let it big after
+							; letitbig.after.spr_gen = #EF00-#800
+							assert letitbig.after.spr_gen>=dollar.letitbig_7FC1
+							;display "letitbig.after.spr_gen-dollar.letitbig_7FC1=",letitbig.after.spr_gen-dollar.letitbig_7FC1
+
+				
+							; utilisable une fois letitbig fini et after-letitbig en // à final
+							;display dollar.final.delete_from_here

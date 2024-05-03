@@ -1,0 +1,589 @@
+
+
+deulignes.main_entry
+	  	; init du script "deuligne" sous int
+	  		call sys.wait_int_vbl_is_over:call sys.zik_at_6
+  if cond.colorz=1
+  else
+   			ld de,deulignes.script0.init:ld bc,timing_dragonfly_red:call sys.put_call_at_VBL_wo_call
+  endif
+	  		
+ 	 	; init buffer sprite & screen
+			ld a,48:call @rot.reset.scr_width_wo_set_CRTC
+			ld a,high adr_spr_draw_deulignes:ld (@rot.adr_spr_draw),a
+			ld a,high adr_spr_fill_deulignes:ld (@rot.adr_spr_fill),a
+ 			ld c,5:call @rot.reset.size_spr ; 16x16
+			ld hl,rot.tab_7Fadrcrtc_16kb:ld (rot.adr_to_tab_7Fadrcrtc),hl
+			
+		; engrenage == deulignes2
+  if cond.colorz=1
+  ld a,#C1:call sys.set_7FCx
+  ld a,#C9:ld (scroller.inc_offset),a
+  ld hl,0:ld de,#400:ld bc,0:call scroller.set_scr
+  ld a,48:ld (sys.crtcreg1val+1),a:ld bc,#BC01:out (c),c:inc b:out (c),a	
+  else
+			;call sys.set_7FC2
+  endif
+ 			call deulignes.gen_background_with_blk ; dessiné en #4000 de 7FC2
+  			ld hl,#4000:ld de,#8000:ld bc,#4000:ldir
+  if cond.colorz=1
+  call sys.set_7FC2
+  ld de,#C180:call scroller.gen_tab_7Fadrcrtc_16kb
+  else
+ 			ld de,#C280:call scroller.gen_tab_7Fadrcrtc_16kb
+  endif
+ 			ld hl,adr_spr_deulignes:ld (hl),0:ld de,adr_spr_deulignes+1:ld bc,#E000-adr_spr_deulignes-1:ldir
+			call deulignes2.engrenage  ; dessiné en #8000 de 7FC2
+			;ld hl,48*4*7:ld (scroller.inc_scr+1),hl ; engrenage
+						
+		; mario == deulignes4 			
+			;call sys.set_7FC2
+ 			;call deulignes.gen_background
+  if cond.colorz=1
+  ld a,#C1:call sys.set_7FCx
+  endif
+ 			call deulignes4.init.mario 
+ 			call deulignes4.mario  ; dessiné en #4000 de 7FC2
+			;ld hl,1024-48*6:ld (scroller.inc_scr+1),hl
+			
+		; recopie de 7FC2 vers 7FC0	
+ 			ld ixh,#80:call deulignes.copy_to_7FC0.loop ; mario - #4000 recopié en #4000
+ 			
+ 		; rubberbar == deulignes1
+  			ld a,#C1:call sys.set_7FCx
+			xor a:ld (deulignes.gen_background.fix+1),a 
+			ld de,#0000:call deulignes.gen_background+3 ; dessiné en #0000 de 7FC1 oui!?
+			call sys.set_7FC2
+ 			ld de,#C100:call scroller.gen_tab_7Fadrcrtc_16kb
+ 			ld hl,adr_spr_deulignes:ld (hl),0:ld de,adr_spr_deulignes+1:ld bc,#E000-adr_spr_deulignes-1:ldir
+			call deulignes1.rubberbar	
+			;ld hl,1024-48*2:ld (scroller.inc_scr+1),hl ; reubber bar
+			call sys.set_7FC2
+			
+ 		; copie engrenages
+			ld ixh,#C0:call deulignes.copy_to_7FC0.loop ; engrenages o - #8000 recopié en #8000
+			
+		ret
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.script0.init
+			ld hl,deulignes.script1:ld bc,-1:jp sys.put_call_at_VBL_wo_last
+deulignes.script1_wait
+			ld a,(scroller.int1+2):and #33:cp #20:ret nz
+ 			xor a:ld (deulignes.script1+1),a
+ 			ld hl,(scroller.int1+1)
+ 			ld a,h:and 3:ld h,a:add hl,hl
+ 			ld de,#8000+50*2:add hl,de
+ 			ld (deulignes.put_bg_col.adr_vram+1),hl
+ 			ld hl,1:ld (scroller.inc_scr+1),hl
+deulignes.script1
+			jr	deulignes.script1_wait		
+	;
+	; arrivée par scroll du fond grillagé
+	;
+			call deulignes.put_gen_doublechar
+			call deulignes.put_bg_col
+			ld a,51:dec a:ld ($-2),a
+			cp 3:jr z,deulignes.script1.fix
+			or a:ret nz
+			ld hl,0:ld (scroller.inc_scr+1),hl
+			ld de,deulignes.script1ends:ld bc,timing_donkey:jp sys.put_call_at_VBL_wo_call
+deulignes.script1.fix
+			ld hl,deulignes.data_background_blk:ld (deulignes.data_background_blk_fix+1),hl
+			ret
+deulignes.script1ends
+	;
+	; bascule sur mario en 3 fois
+	;
+			ld a,48:ld (sys.crtcreg1val+1),a:ld bc,#BC01:out (c),c:inc b:out (c),a	
+			ld hl,1024-48*6:ld de,48*11:ld bc,#0000:call scroller.set_scr
+			ld a,#03:ld (scroller.crtc_16kb_fix+2),a:ld a,#10:ld (scroller.crtc_16kb_fix+4),a
+			ld hl,0:call scroller.out_hl
+ 		ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.copy_to_7FC0.loop
+  			ld hl,#4000
+  			ld de,#D000:ld bc,#1000:ldir
+ 			ld (deulignes.copy_to_7FC0.loop+1),hl 			
+  			ld a,#C1:call sys.set_7FCx
+deulignes.copy_to_7FC0.de_inc
+  if cond.colorz=1
+  ld de,#D000
+  else	  			
+  			ld de,#4000
+  endif
+  			ld hl,#D000:ld bc,#1000:ldir
+  if cond.colorz=1
+  else	  			
+  			ld a,d:ld (deulignes.copy_to_7FC0.de_inc+2),a
+  endif
+  			call sys.set_7FC2
+  			ld a,(deulignes.copy_to_7FC0.loop+2):cp ixh:jr nz,deulignes.copy_to_7FC0.loop
+  		ret	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.put_gen_doublechar
+			ld a,-2:inc a:inc a:and 31:ld (deulignes.put_gen_doublechar+1),a
+			push af
+deulignes.put_gen_doublechar.add_d
+			ld a,1:jr nz,2+$+5:xor 1:ld (deulignes.put_gen_doublechar.add_d+1),a
+deulignes.data_background_blk_fix
+			ld de,deulignes.data_background_inc
+			add a,d:ld d,a
+			pop af
+			add a,e:ld e,a:jr nc,2+$+1:inc d
+			ld hl,deulignes.put_bg_char1+1
+			ld bc,4
+			call deulignes.put_gen_doublechar.call0
+			inc hl:inc hl
+			ld a,(deulignes.put_gen_doublechar.add_d+1):neg:add a,a:add a,d:ld d,a
+deulignes.put_gen_doublechar.call0
+				ld ixh,8 			
+deulignes.put_gen_doublechar.loop0
+					ld a,(de):ld (hl),a:add hl,bc
+					inc de
+					ld a,(de):ld (hl),a:add hl,bc
+					ld a,e:add a,32-1:ld e,a:jr nc,2+$+1:inc d
+					dec ixh:jr nz,deulignes.put_gen_doublechar.loop0
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.gen_background_with_blk
+		ld hl,deulignes.data_background_blk:xor a:ld (hl),a:inc l:jr nz,$-2:inc h:ld (hl),a:inc l:jr nz,$-2
+deulignes.gen_background
+			ld de,#4000
+deulignes.gen_background.loop1
+			ld hl,deulignes.data_background_inc
+			call deulignes.gen_background.call0:call deulignes.gen_background.call0
+			ld a,32:dec a:and 31:ld ($-4),a:jr nz,deulignes.gen_background.loop1
+		ret
+deulignes.gen_background.call0
+				ld a,8
+deulignes.gen_background.loop0
+					ld bc,32:ldir
+					ex de,hl:ld bc,#800-32:add hl,bc:ex de,hl
+					dec a:jr nz,deulignes.gen_background.loop0
+					ld a,e:add a,96:ld e,a:jr nc,2+$+1:inc d	
+					ld a,d:and %00000111
+deulignes.gen_background.fix
+					or %01000000:ld d,a
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes.put_mario
+deulignes.put_mario.fix5
+	ld hl,#4000 ; écran
+deulignes.put_mario.fix2
+	ld iyl,11
+deulignes.put_mario.loop2
+		push hl
+deulignes.put_mario.fix6
+			ld a,0:nop:cp 5:jr nz,2+$+1:xor a:ld ($-7),a
+deulignes.put_mario.fix3
+			ld a,high deulignes4.mario_sprite
+			jr nz,2+$+2+3:xor (high deulignes4.mario_sprite+1) xor (high deulignes4.mario_sprite+2):ld (deulignes.put_mario.fix3+1),a
+			bit 3,h:jr nz,2+$+2:add a,3
+			ld d,a:ld e,0
+			ld b,high rot.tab.mask
+			ld ixh,32			
+deulignes.put_mario.loop1
+				ld ixl,8
+deulignes.put_mario.loop0
+					ld a,(de):ld c,a:inc de
+					ld a,(bc):and (hl):or c:ld (hl),a:inc l
+					dec ixl:jr nz,deulignes.put_mario.loop0
+				ld a,l:sub 8:ld l,a
+				call deulignes.put_mario.call0
+				dec ixh:jr nz,deulignes.put_mario.loop1
+		pop hl
+		ld a,h:and %11111000:ld (3+$+8),a
+deulignes.put_mario.fix4
+		ld bc,5*96:add hl,bc:ld a,h:and %111:or 0:ld h,a
+deulignes.put_mario.fix0
+		ld a,h:add a,8*6:call deulignes.put_mario.call0+3
+deulignes.put_mario.fix1
+		ld a,0:inc a:cp 2:jr nz,2+$+1:xor a:ld ($-7),a:call z,deulignes.put_mario.call0
+		dec iyl:jr nz,deulignes.put_mario.loop2
+	ret
+deulignes.put_mario.call0
+				ld a,h:add a,8:ld h,a:bit 6,h:ret nz
+				sub 8*8:ld h,a:ld a,l:add a,96:ld l,a:ret nc
+				ld a,h:and %11111000:ld (3+$+5),a:ld a,h:inc a:and %111:or 0:ld h,a:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes1.rubberbar
+		; dithered pen?
+			ld bc,%1010010111110101:ld d,%11110000:call @rot.gen.trans_ink   
+		; init scroller		
+			ld hl,scroller.48n35h2:call scroller.init:ld hl,1024-3:ld (scroller.o),hl
+			ld hl,deulignes.scroller.tabvar:ld bc,35:call scroller.tabvar.init ; obligé car l'avancée est à l'envers
+			ld hl,deulignes.scroller.tabvar:ld bc,(35-1)*6:ld de,35*6:call scroller.tabvar.restore			
+		; affiche les pointes
+			ld hl,#10000/4*0+#10000/35/4*4:call deulignes1.call2
+		; affiche le serpentin brut convexe (en 2 fois car la fin écrase le début)
+			ld hl,tab.pts.deulignes1:call rot.reset.pts_then_object
+			call deulignes1.call0
+			call deulignes1.call1_twice
+		; affiche les pointes
+			ld hl,#10000/4*2+#10000/35/4*4:call deulignes1.call2
+		ret
+deulignes1.call0
+			ld hl,#10000/4:ld (deulignes1.calc0+1),hl
+			ld hl,0:ld (scroller.tabvar.nextstep+1),hl
+			ld hl,#0000		
+deulignes1.call0.shunt
+			push hl
+			ld a,24:ld bc,#10000-#10000/35:ld de,1:call scroller.init.sinus_dx
+			pop hl:ld de,#3800:add hl,de
+			ld a,16:ld bc,#10000-#10000/35:ld de,1:call scroller.init.sinus_dy
+			ld hl,#4000:ld (rot.ay_16bits),hl
+			ld hl,#2800:ld (rot.az_16bits),hl
+			ld hl,160:ld (rot.mulu),hl
+			ld a,35:ld (deulignes1.call1_nb+1),a
+		ret
+deulignes1.call1_twice
+		; toutes les frames + 2 sans la face du dessus
+			call deulignes1.call1	
+			xor a:ld (rot.tab.sides_full),a ; change la couleur de la 1ère face dans l'objet
+			ld a,2:ld (deulignes1.call1_nb+1),a
+deulignes1.call1
+		; init object
+			ld hl,#10000/4:ld (deulignes1.calc0+1),hl;ld hl,#0000:ld (rot.ax_16bits),hl
+		; to screen			
+deulignes1.call1_nb
+			ld bc,35 ; nb of loops
+			ld hl,deulignes1.calc ; special call for updating parameters
+				call scroller.direct_to_screen
+		ret
+deulignes1.call2
+			push hl			
+			ld hl,tab.pts.deulignes1bis:call rot.reset.pts_then_object
+			pop hl:ld (deulignes1.calc0+1),hl
+			ld hl,6*4:ld (scroller.tabvar.nextstep+1),hl
+			ld hl,#10000/35*4:call deulignes1.call0.shunt
+			ld bc,35*2:ld hl,deulignes1.calc:call scroller.direct_to_screen
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes1.calc
+						;ld hl,0:ld (scroller.calc.dxraw),hl
+deulignes1.calc0		ld hl,#10000/4
+						ld bc,#10000-#10000/35/4:add hl,bc:ld (deulignes1.calc0+1),hl
+						ld (rot.ax_16bits),hl
+						call scroller.calc.sinus_dx
+						call scroller.calc.sinus_dy
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.48n35h2 ; dh=
+ 		dw 96,96,-35
+ 		db 6 : dw 22  
+		db 0,0:dw 0
+		dw 1872
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.deulignes1
+;pts
+				db  11, 32,-32 ; 
+				db  11,-32,-32 ;  
+				db  11,-32, 32 ;   
+				db  11, 32, 32 ;    
+				db -11, 32,-32 ; 
+				db -11,-32,-32 ;  
+				db -11,-32, 32 ;   
+				db -11, 32, 32 ;    
+			   ;db  11,  0, 32 ;    
+			   ;db -11,  0, 32 ;
+			   ;db -11,-32, 0 ;   
+			   ;db  11,-32, 0 ;
+			  db 0, 18, 32 
+			  db 0, -18, 32 
+			  db 0, -32,-18 
+			  db 0, -32,18
+			 ;db   0, 22, 32   ; 12>8
+			 db  10,  0, 32    ; 13>12
+			 ;db   0,-22, 32   ; 14>9
+			 db -10,  0, 32    ; 15>13
+			;db 0,-32,-22 ;    ; 16>14 
+			db -10,-32,0       ; 
+			;db 0,-32,22 ;11
+			db 10,-32,0
+		   db -1 ; end of pts
+;sides
+			db 0 ; which pt for z ordering
+				db 0,1,2,3,#80+1 ; face du dessus
+				;
+			  	db 7,3,2,6,#80+3 ; face rectangulaire
+			  	db 7,3,8,#80+1
+			  	db 2,6,9,#80+1
+			  	;db 3,2,9,#80+1
+			  	;db 6,7,8,#80+1
+				;
+				db 1,5,6,2,#80+3 ; face rectangulaire
+				db 1,5,10,#80+1
+				db 6,2,11,#80+1
+				;db 5,6,11,#80+1
+				;db 2,1,10,#80+1
+				db 8,12,9,13,#81
+				db 10,14,11,15,#81
+				;
+			defb -2 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+tab.pts.deulignes1bis
+;pts
+				db -3, 6, 32 ;    
+				db  3, 6, 32 ;    
+				db  3,-6, 32 ;   
+				db -3,-6, 32 ;  
+				db -8, 0, 52 ; 
+			db -1 ; end of pts
+;sides
+			db 0 ; which pt for z ordering
+				;
+			  	;db 0,1,2,3,#80+1
+			  	db 0,1,4,#80+2
+			  	db 1,2,4,#80+2
+			  	db 2,3,4,#80+2
+			  	db 3,0,4,#80+2
+				;
+			defb -1 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes2.engrenage
+		; dithered pen
+			ld bc,%1010010110101111:ld d,%11111111:call @rot.gen.trans_ink
+		; init scroller		
+			ld hl,scroller.48n16h4:call scroller.init;ld hl,1024-3:ld (scroller.o),hl
+			ld hl,deulignes.scroller.tabvar:ld bc,16:call scroller.tabvar.init
+			ld hl,deulignes.scroller.tabvar:ld bc,6*7:ld de,16*6:call scroller.tabvar.restore			
+			
+		; init object 1/2	
+d2n=7
+d2t=0
+			call deulignes2.call0.init
+			ld hl,d2t+#10000/d2n*6+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			ld hl,d2t+#10000/d2n*5+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			ld hl,d2t+#10000/d2n*0+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			;ld hl,d2t+#10000/d2n*4+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			;ld hl,d2t+#10000/d2n*1+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			;ld hl,d2t+#10000/d2n*3+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			;ld hl,d2t+#10000/d2n*2+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			
+		; init triangle	
+			ld hl,tab.pts.deulignes2bis:call rot.reset.pts_then_object
+			ld hl,#4000:ld (rot.ay_16bits),hl
+			ld hl,#0000:ld (rot.ax_16bits),hl
+			ld hl,#0000:ld (rot.az_16bits),hl
+			ld hl,150:ld (rot.mulu),hl
+			ld bc,23 ; nb of loops
+			ld hl,deulignes2bis.calc ; special call for updating parameters
+				call scroller.direct_to_screen			
+			ld hl,0:ld (scroller.calc.dyraw),hl
+			ld hl,0:ld (scroller.tabvar.nextstep+1),hl
+
+		; init object 2/2	
+			call deulignes2.call0.init
+			ld hl,d2t+#10000/d2n*4+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			ld hl,d2t+#10000/d2n*1+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			ld hl,d2t+#10000/d2n*3+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			ld hl,d2t+#10000/d2n*2+1*#10000/d2n/2-#10000/d2n/32:call deulignes2.call0
+			
+		ret
+		
+deulignes2.call0
+			ld (deulignes2.calc0+1),hl
+			ld bc,16 ; nb of loops
+			ld hl,deulignes2.calc ; special call for updating parameters
+		jp scroller.direct_to_screen
+deulignes2.call0.init
+			ld hl,tab.pts.deulignes2:call rot.reset.pts_then_object
+			ld hl,#4000:ld (rot.ay_16bits),hl
+			ld hl,#2800:ld (rot.az_16bits),hl
+			ld hl,148:ld (rot.mulu),hl
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes2.calc
+deulignes2.calc0		ld hl,#10000/d2n*2+#10000/d2n/2
+						ld bc,#10000/d2n/16:add hl,bc:ld (deulignes2.calc0+1),hl
+						ld (rot.ax_16bits),hl
+					ret
+deulignes2bis.calc
+						ld hl,(scroller.calc.dyraw)
+						ld bc,#FEA0:add hl,bc
+						ld (scroller.calc.dyraw),hl
+					ret					
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.48n16h4 ; dh=0
+ 		dw 96,384,-16
+ 		db 0 : dw 0  
+		db 0,0:dw 0
+		dw 4096
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.deulignes2
+d2h=12 
+;pts
+			; 0..7
+				db  d2h,32,16    
+				db  d2h,42,21   
+				db  d2h,46,12  
+				db  d2h,59,9
+				db  d2h,59,-9
+				db  d2h,46,-12  
+				db  d2h,42,-21   
+				db  d2h,32,-16
+			; 8..15    
+				db  -d2h,32,16    
+				db  -d2h,42,21   
+				db  -d2h,46,12  
+				db  -d2h,59,9
+				db  -d2h,59,-9
+				db  -d2h,46,-12  
+				db  -d2h,42,-21   
+				db  -d2h,32,-16
+			db -1 ; end of pts
+;sides
+			db 7 ; intérieur
+					db 0,1,2,5,6,7,#80+3 ; face supérieure
+					db 1+8,2+8,2,1,#80+2
+					db 5+8,6+8,6,5,#80+2
+					db 7+8,0+8,0,7,#80+1
+				defb -2 ; -2 pour la trame, -1 sinon 
+			db 4 ; extérieur
+					db 2,3,4,5,#80+3 ; face supérieure
+					db 2+8,3+8,3,2,#80+1
+					db 3+8,4+8,4,3,#80+2
+					db 4+8,5+8,5,4,#80+1
+				defb -2
+		defb -1 ; end of sides
+tab.pts.deulignes2bis
+;pts
+			; 0..7
+				db  0,0,10    
+				db  0,20,0   
+				db  0,0,-10  
+			db -1 ; end of pts
+;sides
+			db 0 ; intérieur
+					db 0,1,2,#80+2 
+				defb -1 ; -2 pour la trame, -1 sinon 
+		defb -1 ; end of sides
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 	if 0
+; deulignes3.statique
+; 		; fix iso
+; 			;ld hl,@rot.gen.sincos_rot_not_iso:ld (@rot.gen_all+1),hl
+; 			;ld a,32:ld (@rot.gen.pts_rot.mulz+1),a;ld hl,#100:ld (@rot.gen.pts_rot.mulu+1),hl
+; 			;ld hl,@rot.gen.sincos_rot_iso:ld (@rot.gen_all+1),hl
+; 		; dithered pen?
+; 			;...
+; 		; init scroller		
+; 			ld hl,scroller.48n11h6:call scroller.init;ld hl,1024-3:ld (scroller.o),hl
+; 			;ld hl,deulignes.scroller.tabvar:ld bc,11:call scroller.tabvar.init
+; 			;ld hl,deulignes.scroller.tabvar:ld bc,6*1:ld de,6*11:call scroller.tabvar.restore			
+; 		; init object
+; 			ld hl,tab.pts.deulignes3:call rot.reset.pts_then_object
+; 			ld hl,#0000:ld (rot.ax_16bits),hl
+; 			ld hl,#3000:ld (rot.ay_16bits),hl
+; 			ld hl,#F400:ld (rot.az_16bits),hl
+; 			ld hl,#200:ld (rot.mulu),hl
+; 		; draw!
+; 			;call sprite.fix.andor.delete_screen
+; 			ld bc,%1111000001010000:call @rot.gen.trans_ink_d_eq_b ; rouge
+; 			ld hl,0+9*0:ld (scroller.o),hl:call deulignes3.draw
+; 			ld bc,%1111111101010101:call @rot.gen.trans_ink_d_eq_b ; vert
+; 			ld hl,0+9*1:ld (scroller.o),hl:call deulignes3.draw
+; 			ld bc,%0101101011111010:call @rot.gen.trans_ink_d_eq_b ; jaune?
+; 			ld hl,0+9*2:ld (scroller.o),hl:call deulignes3.draw
+; 			call sprite.fix.andor.normal
+;  		ret
+; deulignes3.draw	call @rot.gen.sincos_rot_iso
+; 				call scroller.calc_to_screen_once.wo_calc
+; 				call @rot.gen.sides_segs_z
+; 				call @rot.draw_all
+; 				jp sprite.put_sprite
+; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; scroller.48n11h6 ; dh=1.45
+;  		dw 96,480,-11
+;  		db 6 : dw 6  
+; 		db 0,0:dw 0
+; 		dw 5958
+; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; tab.pts.deulignes3
+; ;pts
+; 				db   4,-4,-4    
+; 				db   4,-4, 4   
+; 				db   4, 4, 4  
+; 				db   4, 4,-4
+; 				db  -4,-4,-4    
+; 				db  -4,-4, 4   
+; 				db  -4, 4, 4  
+; 				db  -4, 4,-4
+; 			db -1 ; end of pts
+; ;sides
+; 			db 0 ; intérieur
+; 					db 0,1,2,3,#81 ; face supérieure
+; 					db 2,1,1+4,2+4,#82
+; 					db 3,2,2+4,3+4,#82
+; 				defb -2
+; 		defb -1 ; end of sides
+; 	endif
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deulignes4.mario
+			call deulignes.put_mario
+			ld hl,#4000+16+96*1+#800*7:ld (deulignes.put_mario.fix5+1),hl
+			call deulignes.put_mario
+			ld a,8*3:ld (deulignes.put_mario.fix0+2),a
+			ld a,5:ld (deulignes.put_mario.fix1+4),a
+			ld a,10:ld (deulignes.put_mario.fix2+2),a
+			ld a,1+high deulignes4.mario_sprite:ld (deulignes.put_mario.fix3+1),a
+			ld hl,6*96:ld (deulignes.put_mario.fix4+1),hl
+			ld hl,#4000+8:ld (deulignes.put_mario.fix5+1),hl
+			ld a,#3C:ld (deulignes.put_mario.fix6+2),a
+			call deulignes.put_mario
+			ld hl,#4000+16+8+96*4+#800*2:ld (deulignes.put_mario.fix5+1),hl
+			call deulignes.put_mario
+		ret
+deulignes4.init.mario
+				ld hl,deulignes4.mario_sprite
+				exx
+				ld hl,deulignes4.mario_sprite_src
+				ld bc,%0100110000010011
+				call deulignes4.mario.init.call2
+				ld hl,deulignes4.mario_sprite+#300
+				exx
+				ld hl,deulignes4.mario_sprite_src
+				ld bc,%1000110000100011
+deulignes4.mario.init.call2
+					ld ixh,16*3
+deulignes4.mario.init.loop2
+						push hl:call deulignes4.mario.init.call1
+						pop hl:call deulignes4.mario.init.call1
+					dec ixh:jr nz,deulignes4.mario.init.loop2								
+				ret
+deulignes4.mario.init.call1
+					ld ixl,4
+deulignes4.mario.init.loop0
+						ld a,(hl):call deulignes4.mario.init.call0:exx:ld (hl),a:inc hl:exx
+						ld a,(hl):rlca:rlca:call deulignes4.mario.init.call0:exx:ld (hl),a:inc hl:exx
+						inc hl:dec ixl:jr nz,deulignes4.mario.init.loop0
+					ld a,b:xor %11000000:ld b,a:ld a,c:xor %00110000:ld c,a
+				ret
+deulignes4.mario.init.call0
+					push af:and %10001000:ld d,a:rrca:or d
+					cp %11001100:jr nz,2+$+1:ld a,b
+					ld d,a
+					pop af:and %01000100:rrca:ld e,a:rrca:or e
+					cp %00110011:jr nz,2+$+1:ld a,c
+					or d
+				ret
+

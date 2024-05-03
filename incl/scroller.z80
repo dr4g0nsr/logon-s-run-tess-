@@ -1,0 +1,726 @@
+
+
+; SCROLLER (ORIGINAL)
+; SPRITE,       not used anymore -->  SPRESTO,RESTOSPR,...
+; SCROLLER CALLS TO...
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.gen_tab_7Fadrcrtc_16kb
+				ld hl,rot.tab_7Fadrcrtc_16kb:ld b,6
+				ld (hl),d:inc hl:ld (hl),e:inc hl:djnz $-4
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	SCROLLER PART 1 (mainly the precalc/presegs ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.precalc
+ 		if obsolete.store_pts
+ 		break
+ 		endif
+		ld (scroller.calc.call_spec+1),hl
+		ld (scroller.precalc.store_adr+1),de ; required previously
+scroller.precalc.loop
+				push bc
+					; calculate once 
+						call scroller.calc
+					; store, 1st part						
+scroller.precalc.store_adr	ld hl,0
+scroller.precalc.dx_bytescr	equ $+1
+						ld a,0		
+							ld (hl),a:inc hl ; ..1
+scroller.precalc.dy_scr equ $+1
+						ld a,0
+							ld (hl),a:inc hl ; ..2
+						ld de,(scroller.o)
+							ld (hl),e:inc hl ; ..3
+							ld (hl),d:inc hl ; ..4
+					; store, 2nd part = pts	
+						ld de,@rot.tab.pts_proj+1:ex de,hl ; HIGH at +1 / 16 bits
+						ld a,(@rot.nbpts):ld b,a
+scroller.precalc.loop2
+							ld a,(hl):ld (de),a:inc hl:inc hl:inc de
+							ld a,(hl):ld (de),a:inc hl:inc hl:inc de
+						djnz scroller.precalc.loop2
+						ld (scroller.precalc.store_adr+1),de
+				pop bc:dec bc:ld a,b:or c:jp nz,scroller.precalc.loop
+ 				if obsolete.store_pts
+ 				break
+ 				endif
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.precalc_to
+				; restore, 1st part
+scroller.precalc_to.store_adr 
+					ld hl,0
+							ld a,(hl):inc hl ; ..1
+						ld (@rot.dx_bytescr),a	
+							ld a,(hl):inc hl ; ..2
+						ld (@rot.dy_scr),a
+							ld e,(hl):inc hl ; ..3
+							ld d,(hl):inc hl ; ..4
+						ld (@sprite.scroller_o),de
+				; restore, 2nd part = pts		
+						ld de,@rot.tab.pts_spr
+scroller.precalc_to.nbpts_x2	ld bc,0; (x,y) * nb pts / 8 bits
+						ldir
+					ld (scroller.precalc_to.store_adr+1),hl
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.precalc_to_draw
+						call scroller.precalc_to	
+						;
+						call @rot.gen.sides_segs_z
+						;
+scroller.precalc_to_draw.store_adr
+						ld de,0
+						ld hl,@rot.tab.segs_inked
+						ld a,(rot.nbsegs):ld c,a:ld b,0
+						ldir
+						ld (scroller.precalc_to_draw.store_adr+1),de 
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.presegs_to_screen_once.a_input
+						ld e,a
+						push de
+					;pts
+						ld a,(scroller.precalc_to.nbpts_x2+1):add a,4:ld d,a
+						call sys.mul.8ux8u_sde_left:sbc hl,de ; hl=d*e
+scroller.precalc_to.store_adr.a_input
+						ld de,0:add hl,de:ld (scroller.precalc_to.store_adr+1),hl
+						pop de
+					;segs
+						ld a,(rot.nbsegs):ld d,a
+						call sys.mul.8ux8u_sde_left:sbc hl,de ; hl=d*e
+scroller.presegs_to_screen_once.store_adr.a_input
+						ld de,0:add hl,de:ld (scroller.presegs_to_screen_once.store_adr+1),hl
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.presegs_to_screen_once
+				; restauration des points
+						call scroller.precalc_to
+				; pas de calculs résiduels, restauration des segments encrés
+scroller.presegs_to_screen_once.store_adr
+						ld hl,0
+						ld de,@rot.tab.segs_inked
+						ld a,(rot.nbsegs):ld c,a:ld b,0
+						ldir
+						ld (scroller.presegs_to_screen_once.store_adr+1),hl 
+				; fix pour 1 objet concave
+						xor a:ld (@rot.tab.z_convobj),a
+scroller.fix_2convobj	ld (@rot.tab.z_convobj),a
+				; dessine l'objet 3D dans son buffer
+						call @rot.draw_all
+				; afficher le buffer
+						call sprite.put_sprite				
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.presegs
+			if obsolete.store_segs
+				break
+			endif
+			ld (scroller.precalc_to_draw.store_adr+1),hl			; adr store segs inked
+scroller.presegs.same_adr_store_segs
+			ld (@scroller.precalc_to.store_adr+1),de	; adr store pts precalc
+			; ld bc,...		; nb of loops
+scroller.presegs.loop	
+			push bc
+				call scroller.precalc_to_draw
+			pop bc:dec bc:ld a,b:or c:jr nz,scroller.presegs.loop
+	if obsolete.store_segs
+		ld hl,(@scroller.precalc_to.store_adr+1)
+		ld de,(scroller.precalc_to_draw.store_adr+1)
+		break
+	endif
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.presegs_to_screen
+				ld (scroller.presegs_to_screen_once.store_adr+1),hl ; adr store segs inked					
+				ld (scroller.precalc_to.store_adr+1),de	         ; adr store pts precalc
+								ld hl,scroller.presegs_to_screen_once
+;sys.set_nb_calls_at_VBL.loop	ld a,(scroller.bank):and #30:cp #00:jr nz,sys.set_nb_calls_at_VBL.loop
+								call sys.put_call_at_VBL_wo_last	
+								ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.presegs_to_screen.wo_call_at_VBL
+				ld (scroller.presegs_to_screen_once.store_adr+1),hl ; adr store segs inked					
+scroller.presegs_to_screen.wo_call_at_VBL.same_stored_pts
+				ld (scroller.precalc_to.store_adr+1),de	         ; adr store pts precalc
+scroller.presegs_to_screen.wo_call_at_VBL.loop	
+			push bc
+				call scroller.presegs_to_screen_once
+			pop bc:dec bc:ld a,b:or c:jr nz,scroller.presegs_to_screen.wo_call_at_VBL.loop
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.crtc_64kb	ld a,#FF:ld (scroller.crtc_16kb_fix+2),a:ld a,#0C:ld (scroller.crtc_16kb_fix+4),a:ret
+scroller.crtc_16kb	ld a,#03:ld (scroller.crtc_16kb_fix+2),a:ld a,#10:ld (scroller.crtc_16kb_fix+4),a:ret
+scroller.vbank_on	ld a,#C2:jr 2+$+2
+scroller.vbank_off	ld a,#C3:ld (rot.tab_7Fadrcrtc_C000),a:ret
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	scroller including sprites with calls to rot;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.init_then_rot.reset.pts_then_object
+		push de:call scroller.init:pop hl:jp @rot.reset.pts_then_object
+scroller.init
+		ld de,scroller.copy_tab
+		ld bc,scroller.copy_length
+		ldir
+scroller.reinit
+	; init var
+		ld hl,0
+		ld (scroller.cxm),hl
+		ld (scroller.cym),hl
+	; init tab
+		ld (scroller.o),hl
+;		ld hl,#8000																									??? en MARS 2014
+		ld hl,#0000
+		ld (scroller.py),hl
+;		ld hl,#80FF ; on a mis PX=255 (256 theorique), valable aussi pour un X++ et pas X-- (cf cas c a 151 anim')	??? en MARS 2014
+		ld hl,#00FF ; on a mis PX=255 (256 theorique), valable aussi pour un X++ et pas X-- (cf cas c a 151 anim')
+		ld (scroller.px),hl
+	; init sx=-/+
+		ld hl,#44ED ; == neg
+		ld a,(scroller.sx)
+		cp #FF
+		ld a,1
+		jr z,2+$+3+2
+		ld hl,0
+		ld a,-1
+		ld (scroller.sx_neg),hl
+		ld (scroller.sx_addx+1),a
+	;
+		ld hl,scroller.nextstep+3
+		ld (scroller.nextstep+1),hl
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.nextstep
+			jp scroller.nextstep+3	
+	; cxm =+ dcxm
+			ld hl,(scroller.cxm)
+			ld de,(scroller.dcxm)
+			add hl,de
+	; if cxm >= n
+			ld de,(scroller.n_neg)
+			add hl,de ; ajout de son negatif
+	; then
+	;       'faudra in-de/crementer xm'
+			push af ; if c then inc/dec
+	;		cxm =- n
+			jr c,2+$+1+2
+			or a
+			sbc hl,de
+			ld (scroller.cxm),hl
+	; px = 256e of cxm /n = cxm * inv / 256
+			ld bc,(scroller.invn)
+			call @sys.mul.16ux16u_16u_max
+	;    = - px si sx=-1
+scroller.sx_neg
+			nop
+			nop
+			ld (scroller.px),a
+	; xm =+ dxm 
+			ld a,(scroller.xm)
+			ld e,a
+			ld a,(scroller.dxm)
+			add a,e
+			ld e,a
+	;     -(-1) 'si faut incrementer' ou -(1) si sx=-1
+			pop af
+			ld a,e
+			jr nc,2+$+2
+scroller.sx_addx
+			sub 0
+	; if xm >=4
+			bit 2,a
+	; then
+	;		'faudra incrementer o'
+			push af ; if nz then inc/dec
+	;		xm =- 4
+			res 2,a
+			ld (scroller.xm),a
+	; cym =+ dcym
+			ld hl,(scroller.cym)
+			ld de,(scroller.dcym)
+			add hl,de
+	; if cym >= n
+			ld de,(scroller.n_neg)
+			add hl,de
+	; then
+	;		'faudra in-de/crementer ym'
+			push af ; if c then inc/dec
+	;		cym =- n
+			jr c,2+$+1+2
+			or a
+			sbc hl,de
+			ld (scroller.cym),hl
+	; py = 256e of cym /n = cym * inv / 256
+			ld bc,(scroller.invn)
+			call @sys.mul.16ux16u_16u_max
+			ld (scroller.py),a
+	; ym =+ dym 
+			ld a,(scroller.ym)
+			ld e,a
+			ld a,(scroller.dym)
+			add a,e
+			ld e,a
+	;     +1 'si faut incrementer'
+			pop af
+			ld a,e
+			jr nc,2+$+1
+			inc a
+	; if ym >=8
+			bit 3,a
+	; then
+	;		'faudra augmenter o de lo'	
+			push af ; if nz then augmenter		
+	;		ym =- 8
+			res 3,a
+			ld (scroller.ym),a
+	; o =+ do 
+			ld hl,(scroller.o)
+			ld de,(scroller.do)
+			add hl,de
+	;    + lo 'si il faut'
+			ld de,(scroller.lo)
+			pop af
+			jr z,2+$+1
+			add hl,de
+	;    + 1  'si il faut'
+			pop af
+			jr z,2+$+1
+			inc hl
+	; if o => 2048*4 then modulo
+			res 3+2,h ; bits 3#4 = previously called bk - bank [0..3]
+			ld (scroller.o),hl
+	;
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.tabvar.restore ; called only by doyousea ... then deulignes
+		ld (scroller.tabvar.base_adr+1),hl
+		ld (scroller.tabvar.addadr+1),bc
+		ld (scroller.tabvar.maxadr+1),de
+		ld hl,0
+		ld (scroller.tabvar.nextstep+1),hl
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.tabvar.nextstep ; called only by doyousea ... then deulignes
+		ld hl,0
+scroller.tabvar.base_adr
+		ld bc,0:add hl,bc		
+		ld de,scroller.restore_here;scroller.cxm
+		ld bc,6;10
+		ldir
+		;
+		ld hl,(scroller.tabvar.nextstep+1)
+scroller.tabvar.addadr
+;		ld bc,10:add hl,bc
+		ld bc,6:add hl,bc
+scroller.tabvar.maxadr
+		ld bc,0
+		or a:sbc hl,bc
+		jr nc,2+$+1
+		add hl,bc
+		ld (scroller.tabvar.nextstep+1),hl
+		ret	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.tabvar.init
+		; input bc = le nb de step à sauter
+		; input hl = l'adresse de stockage
+		if obsolete.store_steps
+			break
+		endif
+		ld (scroller.tabvar.base_adr+1),hl
+		ld (scroller.tabvar.store_adr+1),hl
+		ld hl,0
+		ld (scroller.tabvar.nextstep+1),hl
+		ld hl,6;10
+		call @sys.mul.16ux16u_16u_max
+		ld (scroller.tabvar.addadr+1),hl
+		;
+		ld bc,(scroller.n_neg)
+		ld hl,0:or a:sbc hl,bc
+		ld bc,6;10
+		call @sys.mul.16ux16u_16u_max
+		ld (scroller.tabvar.maxadr+1),hl
+		;
+		ld bc,(scroller.n_neg)
+scroller.tabvar.store_adr
+		ld de,0
+scroller.tabvar.init.loop
+			push bc
+				push de
+					call scroller.nextstep
+				pop de
+				ld hl,scroller.restore_here;scroller.cxm
+				ld bc,6;10
+				ldir
+			pop bc
+			inc bc:ld a,b:or c:jr nz,scroller.tabvar.init.loop
+		;
+		ld hl,scroller.tabvar.nextstep
+		ld (scroller.nextstep+1),hl
+	if obsolete.store_steps
+		break
+	endif
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; parametres 
+;
+scroller.copy_tab
+scroller.lo					dw 0	;largeur de l'offset (de l'ecran) en octet (et non plus caracatere)
+scroller.do					dw 0	;le delta de l'offest (de l'ecran) d'une anim a l'autre, et si sx<0 alors -1 
+scroller.n_neg				dw 0	;nombre d'etapes d'animation dans la colonne, rendu negatif pour optimisation
+scroller.dym				db 0	;le delta a chaque étape d'anim de (y modulo 8)
+scroller.dcym 				dw 0	;le delta pour le calcul precis de (y modulo 8)
+scroller.sx					db 0	;le signe de dx, savoir si on inc-dec/remente
+scroller.dxm				db 0	;le delta a chaque etape d'anim de (x modulo 4), pas de negatif, +4 sinon (et -1 char)
+scroller.dcxm 				dw 0	;le delta pour le calcul précis de (x modulo 4)
+scroller.invn 				dw 0	;65536/n pour eviter la division
+scroller.copy_length equ $-scroller.copy_tab
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; variables
+;
+scroller.cxm				dw 0	; compteur pour Xmodulo
+scroller.cym				dw 0	; compteur pour Ymodulo
+scroller.restore_here
+scroller.py  				db 0	; partie non-entiere de Y
+scroller.ym  				db 0	; partie entiere de Y
+scroller.o   				dw 0	; offset, ou plutot adresse ecran (*2 par rapport au crtc), et prefixe par la bank [0..3]
+scroller.px  				db 0	; partie non-entiere de X
+scroller.xm  				db 0	; partie entiere de X
+scroller.copy_end
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite.set_sprsize
+		ld a,e ; hauteur
+		ld (sprite.height1+2),a ; /!\ +2 car ix/iy
+		ld a,d ; largeur
+		ld (sprite.width1+2),a ; /!\ +2 car ix/iy
+		ld (sprite.width2+1),a
+	ld h,#7
+	dec a:jr nz,2+$+1:inc h
+	neg
+	ld (sprite.width5+1),a
+	ld l,a:ld (sprite.width6+1),hl
+; 		dec a:neg
+; 		ld (sprite.width6+1),a
+; 		ld (sprite.width5+1),a
+		; hl <- sprite.unroll.ends+2 - c * 10
+		ld h,high (sprite.unroll.ends+2)
+		ld a,d:add a,a:add a,a:add a,a:jr nc,2+$+1:dec h
+		add a,d:jr nc,2+$+1:dec h
+		add a,d:jr nc,2+$+1:dec h
+		ld l,a:ld a,low (sprite.unroll.ends+2)
+		sub l:ld l,a:jr nc,2+$+1:dec h
+		ld (sprite.ligne.faster.jp1+1),hl 
+		ld (sprite.ligne.faster.jp2+1),hl
+		ld (sprite.ligne.faster.jp3+1),hl
+sprite.set_sprsize.xshunt ld a,#21:sub d:ld (sprite.ligne.loop.shunt+1),a ; add sur l'adresse écran, attention dépend de la largeur du sprite...
+		ld (sprite.ligne.loop.shunt_unroll+1),a
+		ld a,(@rot.scr.yminmax+1) ; ymin
+		neg
+@rot.height_scr_mod8	add a,#80-1
+;		ld h,high @sys.tab.shift:ld l,a:ld a,(hl):inc h:ld h,(hl)
+@rot.shift_for_width3 ld l,2:ld h,a:xor a:srl h:rra:dec l:jr nz,$-4 
+		ld l,a
+		ld a,(@rot.scr.xminmax+2) ; xmin
+		srl a:srl a
+		add a,l:ld l,a
+		ld a,(@rot.adr_spr_fill):add a,h:ld h,a
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@sprite.misc_calc	
+			ld hl,(@rot.scr.xminmax+1) ; H min /// L max
+				ld a,h;;;cp -1:jr nz,2+$+2:break ; case hmin=-1, nothing to do (flag) ???
+				srl a:srl a:ld c,a:ld (@rot.gen.empty_scr.backup_e+1),a  ; C = add x to scr
+				srl l:srl l:ld a,l:sub c:inc a:ld (@rot.gen.empty_scr.backup_d+1),a ; screen width to put 
+			ld hl,(@rot.scr.yminmax+1) ; H min /// L max
+@rot.height_scr_mod5	ld a,#80-1:sub h:ld h,a
+@rot.height_scr_mod6	ld a,#80-1:sub l:ld l,h:ld h,a
+				ld a,l:sub h:inc a:ex af,af  ; screen: height to put
+@rot.dy_scr	equ $+1
+			ld a,0:add a,h:ld h,a			
+			ld a,h:and 7:add a,a:add a,a:add a,a:ld b,a ; = 8 * le reste de la division de y par 8 [#8 #10...#38]
+@rot.scr.width equ $+1 : ld e,0
+			ld d,h:srl d:srl d:srl d:call @sys.mul.8ux8u_sde_left:sbc hl,de ; = y /8 * largeur [00...#7FF]
+			ld a,l
+@rot.dx_bytescr	equ $+1 
+			add a,0:jr nc,2+$+1:inc h
+@rot.gen.empty_scr.backup_e	add a,0:jr nc,2+$+1:inc h:ld l,a
+@sprite.adr_scr equ $+1 : ld de,0
+			bit 3,h:jr z,@rot.fill.temp.samebank2				
+				inc iy
+				inc iy
+				ld a,d
+				sub (iy-1)		; -bank en cours
+				add a,(iy+1)	; +bank prochaine
+				ld d,a
+				res 3,h
+@rot.fill.temp.samebank2
+				ld a,b
+				add a,h
+				ld h,a
+				;ld a,h
+				add hl,de
+				xor h:bit 3,a:jr z,@rot.fill.temp.samebank
+				inc iy
+				inc iy
+				ld a,h
+				sub 8			; -#800 déjà
+				sub (iy-1)		; -bank en cours
+				add a,(iy+1)	; +bank prochaine
+				ld h,a
+@rot.fill.temp.samebank				
+				ld bc,hl ; adr scr = BC
+				ex af,af:ld e,a ; E = screen height to empty 
+@rot.gen.empty_scr.backup_d ld d,0 ; D = screen width
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite.fix.andor.or_screen
+			ld bc,#00B5:jr @sprite.fix.andor.do	; nop: or l
+sprite.fix.andor.xor_screen
+			ld bc,#00AD:jr @sprite.fix.andor.do	; nop: xor l
+sprite.fix.andor.delete_screen
+  			ld bc,#A600:jr @sprite.fix.andor.do	; and (hl):nop
+sprite.fix.andor.normal
+			ld bc,#A6B5							; and (hl):or l
+sprite.fix.andor.do
+				ld de,#10000-10-1
+				ld hl,sprite.unroll.fix.andor
+				ld a,sprite.unroll_nb
+				call @sprite.fix.andor.loop
+				ld hl,sprite.ligne.fix.andor
+				inc a
+sprite.fix.andor.loop	;ex af,af'
+							ld (hl),b
+							inc hl
+							ld (hl),c
+							add hl,de
+						;ex af,af'
+					dec a:jr nz,@sprite.fix.andor.loop
+				ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite.switch_to_sprite
+		ld hl,sprite.switch_to_sprite.data_ends-1
+		ld de,sprite.unroll+sprite.unroll_nb*10-2-1+(sprite.switch_to_sprite.data_ends-sprite.switch_to_sprite.data)
+		ld bc,sprite.switch_to_sprite.data_ends-sprite.switch_to_sprite.data
+		lddr
+		ld hl,sprite.unroll.once+8
+		;ld de,sprite.unroll+sprite.unroll_nb*10-2-1
+		ld bc,9
+		push de
+			lddr
+		pop hl
+		ld a,#13:ld (de),a:dec de ; #13 == inc de
+		ld bc,10*(sprite.unroll_nb-1)-2
+		lddr
+	ret
+;sprite.data_sprite	inc de		; adresse ecran, compatible poids fort++
+; 					inc c		; sprite sans soucis de poids fort
+; 					ld a,(bc)	; récupère octet à poker
+; 					ld l,a		; avec h = high tab.mask
+; 					ld a,(de) 	; récupère octet de l'écran à masquer
+; 					and (hl)	; masque appliqué
+; 					or l 		; octet non masqué
+; 					ld (de),a 	; vers adresse écran
+; 					xor a		; (ai pas envie de chercher plus rapide) 
+; 					ld (bc),a 	; vide le buffer... 
+; sprite.unroll.fix.andor 			equ sprite.unroll+sprite.unroll_nb*10-2-5
+; sprite.unroll.ends				equ sprite.unroll+sprite.unroll_nb*10-2		
+sprite.switch_to_sprite.data
+					dec ixl:ret z	
+; sprite.width6						equ sprite.unroll.ends+3
+					ld hl,#800-sprite.unroll_nb+1
+; sprite.ligne.loop.shunt_unroll	equ sprite.unroll.ends+6
+					ld a,0
+					add a,c:ld c,a:jr nc,2+$+1:inc b
+					add hl,de 			; +prochaine ligne dans le caractère
+					ld a,d
+					xor h
+					ex de,hl
+					bit 6,a				; prochaine ligne de caractère?
+				ld h,high @rot.tab.mask
+; sprite.ligne.faster.jp3 			equ sprite.unroll.ends-6+sprite.switch_to_sprite.data_ends-sprite.switch_to_sprite.data
+					jp z,0 ;;; sprite.charactere.loop ;;; 0 ;sprite.unroll
+					jp sprite.ligne.loop.shunt_for_real
+sprite.switch_to_sprite.data_ends
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite.put_sprite
+				; input =
+				; 		w	@sprite.scroller_o
+				;		b	@rot.dy_scr
+				;		b	@rot.dx_bytescr
+				;		w	@rot.scr.xminmax
+				;		w	@rot.scr.yminmax
+				;
+				; before last call, modified =
+				;		b 	(sprite.height1+2)
+				;		b 	(sprite.width1+2)=(sprite.width2+1)
+				;		b 	(sprite.width6+1)=(sprite.width5+1)
+				;		w 	(sprite.ligne.faster.jp1+1)=(sprite.ligne.faster.jp2+1)
+				;
+				ld a,(@rot.scr.xminmax+2):cp -1 ;  case hmin=-1, nothing to do (flag) ???
+				if 	debug.flag_blankspr		
+					jr nz,2+$+3:break:ret	
+				else
+					ret z
+				endif
+sprite.scroller_o equ $+1 : ld bc,0
+				ld a,b:and 11000b:rrca:rrca
+			 	ld hl,(@rot.adr_to_tab_7Fadrcrtc):add a,l:ld l,a:jr nc,2+$+1:inc h
+			 	ld (@sprite.val_7Fadrcrtc),hl
+			 	inc hl:ld h,(hl):ld l,0
+			 	ld a,b:and 00000111b:ld b,a:add hl,bc
+			 	ld (@sprite.adr_scr),hl
+@sprite.val_7Fadrcrtc equ $+2 : ld iy,0
+				call @sprite.misc_calc
+				call sprite.set_sprsize
+				ld de,bc
+sprite.put_sprite.jp_sprite
+				jp sprite.7FCx.put ; /!\ 7FCx <-------------------
+
+				
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.direct_to_screen_once
+		ld (scroller.o),hl:ld bc,1:jr scroller.direct_to_screen.loop
+scroller.direct_to_screen
+		; DE not required	
+		ld (scroller.calc.call_spec+1),hl
+scroller.direct_to_screen.loop
+			push bc
+				call scroller.calc_to_screen_once
+		; calculs résiduels
+				call @rot.gen.sides_segs_z
+		; dessine l'objet 3D dans son buffer
+				call @rot.draw_all
+		; afficher le buffer
+				call sprite.put_sprite
+			pop bc:dec bc:ld a,b:or c:jr nz,scroller.direct_to_screen.loop
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.calc_to_screen_once
+					; calculate once 
+						call scroller.calc
+scroller.calc_to_screen_once.wo_calc
+					; not store but copy from ex-precalc to spr/to_screen						
+						ld a,(scroller.precalc.dx_bytescr):ld (@rot.dx_bytescr),a
+						ld a,(scroller.precalc.dy_scr):ld (@rot.dy_scr),a
+						ld hl,(scroller.o):ld (@sprite.scroller_o),hl
+					; pts
+scroller.proj_to_spr.wo_calc
+						ld hl,@rot.tab.pts_proj+1 ; HIGH of 16bits values
+						ld de,@rot.tab.pts_spr
+						ld a,(@rot.nbpts):ld b,a
+scroller.calc_to_screen_once.loop
+							ld a,(hl):ld (de),a:inc hl:inc hl:inc e
+							ld a,(hl):ld (de),a:inc hl:inc hl:inc e
+						djnz scroller.calc_to_screen_once.loop
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.calc
+					; specific value for angles & moves
+scroller.calc.call_spec	call scroller.proj_backup.call_spec.return						
+					; rotation itself	
+						call @rot.gen.sincos_rot_iso
+scroller.calc.wo_rot.wo_call_spec
+					; scroller
+scroller.calc.fix_no_nextstep
+						call scroller.nextstep
+					; may modify some points on @rot.tab.pts_proj
+scroller.pre_modify		call scroller.modify.return
+					; dyraw
+scroller.calc.dyraw equ $+1 
+						ld hl,0		 						
+						ld a,h:inc h:ld d,a:ld e,0:or a:ex de,hl:sbc hl,de
+							ld (scroller.precalc.dy_scr),a
+						ex de,hl			
+		 			; dy-py		
+ 						ld bc,(scroller.py):ld hl,#800:or a:sbc hl,bc
+						add hl,de:ex de,hl
+	 				; dxraw	
+scroller.calc.dxraw equ $+1 
+						ld hl,0		 						
+						ld a,h:and 11111100b:ld c,a:xor h:ld h,a:ld a,c:rrca:rrca
+							ld (scroller.precalc.dx_bytescr),a
+					; dx+px
+						ld bc,(scroller.px):add hl,bc:ld bc,hl
+					; on each point
+						ld hl,@rot.tab.pts_proj
+						ld a,(@rot.nbpts)
+scroller.modify.add_bcde
+scroller.calc.loop2 		ex af,af
+								ld a,c:add a,(hl):ld (hl),a:inc hl
+		 						ld a,b:adc a,(hl):ld (hl),a:inc hl
+		  						ld a,e:add a,(hl):ld (hl),a:inc hl
+		  						ld a,d:adc a,(hl):ld (hl),a:inc hl
+	  						ex af,af
+	  					dec a:jr nz,scroller.calc.loop2
+scroller.modify.return
+	  				ret
+	  				
+	  				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.init.default_zeros
+					; rotation set to 0 since a flat square is required
+						ld hl,#0000
+			 				ld (scroller.calc.dxraw),hl
+			 				ld (scroller.calc.dyraw),hl
+					; no special calc for rot angles zoom...
+						ld hl,scroller.proj_backup.call_spec.return
+							ld (scroller.proj_backup.call_spec+1),hl
+							ld (scroller.calc.call_spec+1),hl
+scroller.init.default_zeros.wo_calc
+			 		; with the zoom set to 128, pixel units are set from tab_pts
+						ld hl,128
+							ld (rot.mulu),hl
+					; rotation set to 0 since a flat square is required
+						ld hl,#0000
+							ld (rot.ax_16bits),hl
+							ld (rot.ay_16bits),hl
+							ld (rot.az_16bits),hl
+					ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;scroller.proj_backup.to_screen	
+;			ld (scroller.proj_backup.to_screen.nb_loops+1),bc
+scroller.proj_backup.to_screen.wo_BC ; appelé que dans doydousea
+			ld (scroller.proj_backup.call_spec+1),hl
+scroller.proj_backup.to_screen.same_HL.same_BC
+scroller.proj_backup.to_screen.nb_loops
+			ld bc,0
+scroller.proj_backup.to_screen.same_HL.wo_BC
+scroller.proj_backup.to_screen.loop
+			push bc
+				call scroller.proj_backup.to_screen_once
+			pop bc:dec bc:ld a,b:or c:jr nz,scroller.proj_backup.to_screen.loop
+		ret						
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		

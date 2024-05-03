@@ -1,0 +1,321 @@
+
+nx1 equ 24/4
+ny1 equ 23
+nx2 equ 16/4
+ny2 equ 12
+nx3 equ 24/4
+ny3 equ 22
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scroller.52f64
+ 		dw 104,416,-64
+ 		db 0
+ 		dw 0
+ 		db 1,0
+ 		dw 0,1024
+; scroller.52f49
+;  		dw 104,415,-49
+;  		db 0
+;  		dw 8
+;  		db -1,4
+;  		dw 32,1337
+scroller.52f51
+ 		dw 104,311,-51
+ 		db 6
+ 		dw 46
+ 		db -1,4
+ 		dw 32,1285
+; scroller.52f79
+;  		dw 104,312,-79
+;  		db 7
+;  		dw 71
+;  		db 1,0
+;  		dw 32,830
+scroller.52f78
+ 		dw 104,416,-78
+ 		db 0
+ 		dw 24
+ 		db 1,0
+ 		dw 32,840
+; scroller.52f157
+;  		dw 104,416,-157
+;  		db 0
+;  		dw 16
+;  		db 1,0
+;  		dw 64,840 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lite.pre_draw ; draw in virtual bank for later user
+		; empty virtual 16KB screen + fix
+			ld hl,#4000:ld a,#C2:ld de,#4000+%00000000:call sys.fill_xxxx	
+			ld a,#C2:ld (sprite16k.fix_bank+1),a
+		; 
+			ld hl,scroller.52f64:ld a,1:call lite.gen_scroller_buffer						; background = grey dsk
+			ld hl,sprite16k.datatest:ld de,lite.sprite_buffer:ld bc,nx1*ny1:ldir
+;			ld hl,#100*6+64:ld (lite.cmp_scroller_buffer+1),hl		;;; <--- 1!!
+;			ld a,nx1:ld (sprite16k.width+2),a:ld a,ny1:ld (sprite16k.height+2),a
+			ld iyh,64:call lite.sprite.put_and_scroll:dec iyh:jr nz,$-5
+		;
+;;;			 call lite.draw_heart
+			 
+;;;		ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.draw_heart
+																								; heart is under
+ 			ld hl,sprite16k.under.loopx:ld (sprite16k.adr_call+1),hl
+ 			ld hl,scroller.52f51:ld a,4:call lite.gen_scroller_buffer
+ 			ld hl,sprite16k.datatest+nx1*ny1*2:ld bc,256*ny2+nx2:ld de,#100*1+51:call lite.gen_sprite16k
+ 			ld iyh,51:call lite.sprite.put_and_scroll:dec iyh:jr nz,$-5
+ 			ld hl,sprite16k.put.loopx:ld (sprite16k.adr_call+1),hl
+ 																								; del into dsk
+			xor a:ld (sprite16k.put.fix_del),a ; #B5 == OR L  versus #00 = NOP
+			ld hl,scroller.52f64:ld a,1:call lite.gen_scroller_buffer							
+			ld hl,sprite16k.datatest+nx1*ny1:ld de,lite.sprite_buffer:ld bc,nx1*ny1:ldir
+ 			ld hl,#100*1+64:ld (lite.cmp_scroller_buffer+1),hl
+			ld a,nx1:ld (sprite16k.width+2),a:ld a,ny1:ld (sprite16k.height+2),a
+			ld iyh,64:call lite.sprite.put_and_scroll:dec iyh:jr nz,$-5
+			ld a,#B5:ld (sprite16k.put.fix_del),a ; #B5 == OR L  versus #00 = NOP
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+lite.entry
+
+		; fix again
+			ld a,#C1:ld (sprite16k.fix_bank+1),a
+		; scroller		
+			if cond.colorz=1
+	  		else
+			call scroller.crtc_16kb
+			endif
+			ld a,#C9:ld (scroller.inc_offset),a
+			if cond.colorz=1
+			ld hl,0:ld de,51*11:ld bc,#3280:call scroller.set_scr
+			else
+			ld hl,52*4*4:ld de,52*11*0:ld bc,#0000:call scroller.set_scr
+	  		endif
+					
+
+		; generate sprite
+			ld hl,scroller.52f64:ld a,1:call lite.gen_scroller_buffer						; background = dsk
+			ld hl,sprite16k.datatest:ld de,lite.sprite_buffer:ld bc,nx1*ny1:ldir
+		; déjà setté /// NON, maintenant à resetter
+			ld hl,#100*6+64:ld (lite.cmp_scroller_buffer+1),hl		
+;			ld a,nx1:ld (sprite16k.width+2),a:ld a,ny1:ld (sprite16k.height+2),a
+		;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;lite.int_init1_2
+																							; background = dsk 1/2
+			ld hl,#4B4C:ld (sys.ink1val),hl:ld a,#40:ld (sys.ink3val),a
+			if cond.colorz=1
+	  		ld a,51:ld (sys.crtcreg1val+1),a
+			else
+			ld a,52:ld (sys.crtcreg1val+1),a
+			ld hl,52*11:ld (scroller.inc_split+1),hl
+			endif
+			ld hl,lite.int_call2:ld de,lite.int_init2_3:ld bc,32:call sys.put_call_at_VBL
+			;
+			ld ix,#C2C3
+		jp sys.copy_4000
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.int_call2
+			call sys.7FC1_3.backup
+			call lite.sprite.put_and_scroll
+			jp sys.7FC1_3.restore
+lite.int_init2_3																				; background = dsk 2/2
+			ld a,(lite.cpt_scroller_buffer+1):xor 1:ld (lite.cpt_scroller_buffer+1),a		
+			ld hl,lite.int_call2:ld de,lite.int_init3_4:ld bc,32:jp sys.put_call_at_VBL
+lite.int_init3_4																				
+ 			call sys.7FC1_3.backup:call sys.set_7FC2
+;;;			call lite.draw_heart
+			ld a,#C3:ld (sprite16k.fix_bank+1),a
+			ld hl,lite.sin_scroller:ld de,lite.int_init5_6:ld bc,timing_lite_dsk:call sys.put_call_at_VBL
+			call lite.sin_scroller ; for 1st frame
+			ld a,low inter.line_00_2:ld hl,inter.which_int+1:cp (hl):jr nz,$-1 ; wait for last INT			
+			if cond.colorz=1
+	  		else
+ 			ld a,#30:ld (scroller.crtc_16kb_fix+4),a
+ 			endif																					
+			jp sys.7FC1_3.restore
+lite.int_call5
+ 			call lite.ink_splash0
+ 			jp 	lite.sin_scroller	
+; lite.int_init4_5
+; 			ld hl,lite.sin_scroller:ld de,lite.int_init5_6:ld bc,2*85-6-6-20:jp sys.put_call_at_VBL
+lite.int_init5_6
+			ld hl,lite.int_call5:ld de,lite.int_init6_7:ld bc,4:jp sys.put_call_at_VBL
+lite.int_init6_7
+ 			call sys.7FC1_3.backup:call sys.set_7FC2
+			ld hl,#4054:ld (sys.ink1val),hl
+			if cond.colorz=1
+	  		else
+			xor a:ld (scroller.inc_offset),a ; scroll ON			
+			endif
+			call sys.wait_int_vbl_is_over
+																								; remove heart and red
+			call sprite16k.keep_inks_2_and_3
+			ld hl,#4B4C:ld (sys.ink1val),hl
+ 																								; planifie les fantomes
+ 			ld hl,scroller.52f78:xor a:call lite.gen_scroller_buffer
+
+ 			ld hl,sprite16k.datatest+2*nx1*ny1+nx2*ny2:ld bc,256*ny3+nx3:ld de,#100*4+78:call lite.gen_sprite16k
+			ld hl,lite.int_call2:ld de,lite.int_init7_8:ld bc,78/2:call sys.put_call_at_VBL
+			jp sys.7FC1_3.restore
+lite.int_init7_8
+			ld a,(lite.cpt_scroller_buffer+1):xor 1:ld (lite.cpt_scroller_buffer+1),a		
+			ld hl,lite.int_call2:ld de,lite.int_init8_9:ld bc,78/2:jp sys.put_call_at_VBL	
+lite.int_init8_9
+			ld de,lite.int_init9_10:ld bc,timing_lite_ghost:jp sys.put_call_at_VBL_wo_call				 
+lite.int_init9_10
+			ld hl,sprite16k.del.loopx:ld (sprite16k.adr_call+1),hl	
+			if cond.colorz=1
+	  		else
+			ld a,#54:ld (sys.ink3val),a															; arrière-plan inhibé
+			endif
+			ld hl,lite.int_call2:ld de,lite.int_init10_11:ld bc,78/2:jp sys.put_call_at_VBL		; efface fantome 1/2
+lite.int_init10_11
+			ld a,(lite.cpt_scroller_buffer+1):xor 1:ld (lite.cpt_scroller_buffer+1),a		
+			ld hl,lite.int_call2:ld de,lite.int_init11_12:ld bc,78/2:jp sys.put_call_at_VBL		; efface fantome 2/2
+lite.int_init11_12
+ 			ld hl,sprite16k.put.loopx:ld (sprite16k.adr_call+1),hl
+		 	ld a,51:ld (sys.crtcreg1val+1),a
+ 			call scroller.crtc_64kb
+ 			ld hl,51*24-#400+#1000:ld de,51*11:ld bc,#0045:call scroller.set_scr 
+;break
+			ld a,#C9:ld (scroller.inc_offset),a
+			ld bc,#BC06:out (c),c:ld bc,#BD0B:out (c),c
+			ld b,#7F:ld hl,#0154:out (c),h:out (c),l:inc h:out (c),h:out (c),l
+			ld hl,sys.ink1val:ld (hl),RGB010:inc hl:ld (hl),#56:inc hl:ld (hl),#5A
+			ld hl,sys.ink0val:ld (lite.ink_splash0.fix+1),hl
+			jp sys.zik_at_1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.gen_scroller_buffer
+			ld (lite.gen_scroller_buffer_hl+1),hl
+			ld hl,scroller.copy_tab:ld de,lite.scroller_backup:ld bc,scroller.copy_end-scroller.copy_tab:push hl:push de:push bc:ldir
+			push af
+lite.gen_scroller_buffer_hl ld hl,0:call scroller.init
+			pop af:ld (scroller.o),a
+			ld a,(scroller.n_neg) ; LOW from 16b
+			neg:ld iyh,a
+			ld de,lite.scroller_buffer ; backup ym, o(16b), xm
+lite.gen_scroller_buffer.loop0
+			ld hl,scroller.py+1
+			ldi:ldi:ldi:inc hl:ldi
+			push de
+			call scroller.nextstep
+			pop de
+			dec iyh:jr nz,lite.gen_scroller_buffer.loop0
+			pop bc:pop hl:pop de:ldir
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.gen_sprite16k
+			ld (lite.cmp_scroller_buffer+1),de
+			ld a,c:ld (sprite16k.width+2),a:ld (sprite16k.init.width+2),a
+			ld a,b:ld (sprite16k.height+2),a:ld (sprite16k.init.height+2),a
+			xor a:add a,c:djnz $-1:ld c,a:ld b,0
+			ld (lite.adr_add_bc+1),bc
+lite.gen_sprite16k.shunt
+			ld de,lite.sprite_buffer:push de:ldir:pop hl
+			call sprite16k.init
+			call sprite16k.init
+sprite16k.init
+; sprite16k.fix_bc1
+; 		ld bc,0:ex de,hl:add hl,bc:ex de,hl
+sprite16k.init.height
+		ld ixl,22	
+sprite16k.init.loop2
+sprite16k.init.width
+			ld ixh,7
+			ld c,0			
+sprite16k.init.loop1
+			ld a,(hl):rra:and %01110111
+			bit 4,c:jr z,2+$+2:set 7,a
+			bit 0,c:jr z,2+$+2:set 3,a
+			ld (de),a:inc de
+			ld c,(hl):inc hl
+			dec ixh:jr nz,sprite16k.init.loop1
+		dec ixl:jr nz,sprite16k.init.loop2
+; sprite16k.fix_bc2
+; 		ld bc,0:add hl,bc
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.sprite.put_and_scroll
+lite.cmp_scroller_buffer
+			ld bc,#100*1+64
+;;;			ld bc,#100*6+64
+lite.cpt_scroller_buffer
+			ld a,-1:add a,b:sub c:add a,c:jr c,2+$+1:sub c:ld (lite.cpt_scroller_buffer+1),a
+			ld l,a:ld h,0:add hl,hl:add hl,hl
+			ld de,lite.scroller_buffer:add hl,de
+			; 4 bytes = ym, o(16b), xm
+			;ld a,(scroller.ym):add a,a:add a,a:add a,a:add a,#40:ld d,a ; #40+y*8
+			ld a,(hl):add a,a:add a,a:add a,a:add a,#40:ld d,a ; #40+y*8
+			inc hl
+			;ld a,(scroller.o):ld e,a
+			ld e,(hl)
+			inc hl			
+			;ld a,(scroller.o+1):and 7:add a,d:ld d,a
+			ld a,(hl):and 7:add a,d:ld d,a
+			inc hl
+			;ld a,(scroller.xm):	and 3:add a,high lite.sprite_buffer:ld (sprite16k.datasprite+2),a
+			ld a,(hl)
+			ld hl,lite.sprite_buffer
+lite.adr_add_bc
+			ld bc,0	
+			jr 2+$+2
+				add hl,bc:dec a
+			or a:jr nz,$-3		
+			ld (sprite16k.datasprite+1),hl
+			jp sprite16k.put
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.sin0 equ 0
+lite.sin_scroller
+			ld a,#C0:add a,3:ld ($-3),a
+			call sys.cosinus_16384
+			ld a,h:add a,#40:ld e,a
+			ld a,lite.sin0:add a,1:ld ($-3),a
+			add a,e:ld e,a
+;			rra:add a,e:rra:srl a:ld e,a
+			rra:ld e,a
+			ld d,0:ld bc,1*52*4
+			call @sys.mul.16sx16s_24smax
+			ld a,l:and %1100:add a,a:add a,a:ld d,a
+			ld a,l:and %0011:add a,d:ld d,a
+			ld e,c
+			ld hl,#3000
+			call scroller.add_hl_de
+			if cond.colorz=1
+			else
+			ld (scroller.int1+1),hl
+			endif
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.ink_splash0
+			ld hl,lite.ink_splash0.data
+			ld a,(hl)
+;			or a:ret z
+lite.ink_splash0.fix
+			ld (sys.ink1val),a
+			inc hl
+			ld (lite.ink_splash0+1),hl
+			ret
+lite.ink_splash0.data 
+;;;			db RGB211,RGB222,RGB211,RGB200,RGB100,RGB000,RGB000
+			db RGB211,RGB111,RGB000,RGB000
+			db RGB001,RGB002,RGB012,RGB022,RGB222,RGB022,RGB012,RGB002,RGB001,RGB000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

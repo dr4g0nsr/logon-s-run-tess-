@@ -1,0 +1,328 @@
+
+
+		output "output/dummy"
+		org #0000
+		incbin "output/tess0000.bin"
+length_tess0000.bin
+
+
+		output "output/dummy"
+		org #0000
+		incbin "output/tess8000.bin"
+length_tess8000.bin
+
+
+		output "output/dummy"
+		org #0000
+		incbin "output/tessE000.bin"
+length_tessE000.bin
+
+
+; 		output dummy
+; 		org #0000
+; 		incbin other.pck
+; length_other.pck
+ 
+ 
+		output "output/logon's."
+		org #170-#80
+			defb #00,#43,#41,#4C,#4C,#26,#31,#37,#43,#42,#41,#53,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#70,#01,#00
+			defw                                 length ;#3F80
+			defb                                         #00,#00,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defw length ;#3F80
+			defb         #00
+			defw             #04B2-2*(#3F+#80)+2*((LOW length)+(HIGH length));#04B2
+			defb                     #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defb #00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00
+			defb #0A,#00,#01,#00,#83,#20,#1C,#7C,#01,#00,#00,#00
+		assert $=#17C
+		
+tess_copy				equ #5800 : assert tess_copy > length + #170 : assert tess_copy+#4000+#1400+#1300<#C000
+tess_stack 				equ #FF80
+tess_jp_adr 			equ #F2FF;F302			
+exo_mapbasebits 		equ #FD00 ;	rot.tab.pts_spr ; defs rot.max.pts*2,0 ; TAB/pts (n<126)"
+				
+exo_with_literals 		equ 1
+exo_ixh 				equ 1
+debug.breakend 			equ 0 ; no RET after the job is completed
+exo_bcnohi 				equ 0 ; no high value of BC found, B can be assumed always = 0
+test.bcvalues1 			equ 0 ; TEST ONLY to save BC values in extra-banks (see below exo_bcnohi)
+test.bcvalues2 			equ 0 ; TEST ONLY, no succes on this one (B varies from 0 to 3 or 4)
+
+
+
+;Exomizer 2 Z80 decoder
+; by Metalbrain
+; compression algorithm by Magnus Lind
+; small MODs by Overflow
+; +1    avoid use of AF' to be Amstrad Basic compliant (+1 byte)
+; -1    ld a,c moved to exo_getbits (-1 byte)
+; -4	added condition for possible optimisation depending on data (-4 bytes, see exo_bcnohi)
+; -2    added condition to avoid use of IXH, self-modified code (-2 bytes)
+; -5    no more JP Z but RET Z when decompression is over (up to -5 bytes if CALL then JP)
+; +D	conditionnal source to enable literals decompression
+
+
+			;db #ED,#FF
+			
+			di:ld sp,tess_stack 
+
+						
+		; move code to 7FC1 somewhere around F000
+			ld bc,#7FC1:out (c),c
+			ld hl,code_source
+			ld de,tess_jp_adr:push de
+			ld bc,code_length
+			ldir
+			ret
+
+code_source	
+			phase tess_jp_adr	
+			
+						
+		; decrunch tess0000 and tessE000 (packed together) 
+			ld hl,compressed_tess0000thenE000
+			ld de,tess_copy; çà décompresse  à <D300 max
+			push de
+			call ddeexo
+
+		; copy tess0000
+			pop hl;ld de,tess_copy
+			ld de,#0000
+				call call_copy_2000 : assert length_tess0000.bin > #2000
+			ld bc,length_tess0000.bin-#2000
+				call call_copy		: assert length_tess0000.bin < #4001
+				
+			;	call call_copy_2000	: assert length_tess0000.bin > #4000
+			;ld bc,length_tess0000.bin-#4000
+			;	call call_copy		: assert length_tess0000.bin < #6000
+			
+		; copy tess8000
+			ld de,#8000
+				call call_copy_2000 : assert length_tess8000.bin > #2000
+			ld bc,length_tess8000.bin-#2000
+				call call_copy		: assert length_tess8000.bin < #4000			
+				
+		; copy tessE000 to C3/C1
+			ld de,#E000
+			push de
+			ld bc,length_tessE000.bin
+				ldir
+			
+;		; copy other
+;			ld de,#????
+;			ld bc,length_other
+;				call call_copy		: assert length_other.bin < #2000
+			
+		; ends!
+			ret;jp #E000
+
+			
+call_copy_2000		ld bc,#2000		
+call_copy			push bc,de:ld de,#D300:ldir:ld bc,#7FC2:out (c),c:pop de,bc:push hl:ld hl,#D300:ldir:pop hl
+												ld bc,#7FC1:out (c),c:ret
+			
+			
+ddeexo:		
+;input: 	hl=compressed data start
+;			de=uncompressed destination start
+				ld	b,52
+				ld	iy,exo_mapbasebits
+				if exo_ixh
+					ld	ixh,128 ; ix is not used anymore as "the" bit which slides :)
+				endif 
+				push	de
+exo_initbits:		ld	a,b
+					sub	4
+					and	15
+					jr	nz,exo_node1
+					ld	de,1		;DE=b2
+exo_node1:			ld	c,16
+exo_get4bits:		call	exo_getbit
+					rl	c
+					jr	nc,exo_get4bits
+					ld	(iy+0),c	;bits[i]=b1
+					push	hl
+						inc	c
+						ld	hl,0
+						scf
+exo_setbit:				adc	hl,hl
+						dec	c
+						jr	nz,exo_setbit
+						ld	(iy+52),e
+						ld	(iy+104),d	;base[i]=b2
+						add	hl,de
+						ex	de,hl
+						inc	iy
+					pop	hl
+					djnz	exo_initbits
+					if exo_with_literals
+					inc c
+					endif
+exo_literalseq:
+				pop	de
+exo_literalcopy:
+				if exo_with_literals
+				ldir
+exo_mainloop:	ld c,1
+				else
+				ldi
+exo_mainloop:
+				endif
+				call	exo_getbit	;literal?
+				jr	c,exo_literalcopy
+				ld	c,255
+exo_getindex:	inc	c
+				call	exo_getbit
+				jr	nc,exo_getindex
+				ld	a,c		;C=index
+				cp	16
+				if debug.breakend
+				jr nz,2+$+2:db #ED,#FF
+				endif
+				ret	z;;;jp z,uncompressed_jp
+				if exo_with_literals
+				jr c,exo_continue
+				push de
+					ld d,16
+					call exo_getbits
+					jr exo_literalseq
+				endif
+exo_continue	push	de
+					call	exo_getpair
+					if test.bcvalues1 ; for test only!!!
+					push bc,de,hl
+						ld de,bc
+test.bcvalues1.savehl	ld hl,#4000
+						ld bc,#7FC6:out (c),c:ld (hl),d
+						ld bc,#7FC7:out (c),c:ld (hl),e
+						ld bc,#7FC0:out (c),c
+						inc hl:ld a,h:cp#80:jr nz,2+$+2:ld a,#40
+						ld (test.bcvalues1.savehl+1),hl
+					pop hl,de,bc
+					endif
+					ld (exo_length+1),bc;;;
+										;;;	push	bc
+										;;;	pop	af
+										;;;	ex	af,af'		;length in AF'
+					ld	de,512+48	;1?
+					if  exo_bcnohi
+					dec c
+					else 
+					dec	bc ; does not change flag, Z flag is TRUE if B=0
+					ld	a,b ; do not remove!
+					or	c
+					endif
+					jr	z,exo_goforit
+					ld	de,1024+32
+					if  exo_bcnohi
+					dec c
+					else 
+					dec	bc ; does not change flag, Z flag is TRUE if B=0
+					ld	a,b ; do not remove!
+					or	c
+					endif
+					jr	z,exo_goforit
+					ld	e,16
+exo_goforit:		call	exo_getbits
+	 				;ld a,c ; moved to exo_getbits
+					add a,e ;;; MOD
+						;;; ld	a,e
+						;;; add	a,c
+					ld	c,a
+					call	exo_getpair	;bc=offset
+					if test.bcvalues2 ; for test only!!!
+					push bc,de,hl
+						ld de,bc
+test.bcvalues2.savehl	ld hl,#4000
+						ld bc,#7FC6:out (c),c:ld (hl),d
+						ld bc,#7FC7:out (c),c:ld (hl),e
+						ld bc,#7FC0:out (c),c
+						inc hl:ld a,h:cp#80:jr nz,2+$+2:ld a,#40
+						ld (test.bcvalues2.savehl+1),hl
+					pop hl,de,bc
+					endif
+				pop	de		;de=destination
+				push	hl
+					ld	h,d
+					ld	l,e
+					sbc	hl,bc		;hl=origin
+exo_length			ld bc,0	;;;
+							;;;		ex	af,af'
+							;;;		push	af
+							;;;		pop	bc		;bc=length
+					ldir
+				pop	hl		;Keep HL, DE is updated
+				jr	exo_mainloop	;Next!
+
+exo_getpair:	ld	iyl,c
+				ld	d,[iy+0]
+				call	exo_getbits
+	 			;ld a,c ; moved to exo_getbits
+				add	a,[iy+52]
+				ld	c,a
+				ld	a,b
+				adc	a,[iy+104]	;Always clear C flag
+				ld	b,a
+				ret
+exo_getbits:	ld	bc,0		;get D bits in BC
+exo_gettingbits:dec	d
+				ld a,c ; MOD, added
+				ret	m
+				call	exo_getbit
+				rl	c
+				rl	b
+				jr	exo_gettingbits
+exo_getbit:		
+				if exo_ixh
+				ld	a,ixh		;get one bit
+				add a,a
+				ld ixh,a
+				ret nz
+				ld	a,(hl)
+				inc	hl
+				rla
+				ld ixh,a
+				ret
+				else
+				ld a,128	; MOD
+				add	a,a
+				jr nz,exo_getbit_save ; MOD
+							;;;ld	ixh,a
+							;;;ret	nz
+				ld	a,(hl)
+				inc	hl
+				rla
+exo_getbit_save ld (exo_getbit+1),a ; MOD
+							;;;ld	ixh,a
+				ret
+				endif
+ddeexo_ends
+			dephase
+			
+code_length	equ $-code_source			
+;compressed_48x34gfx			incbin 48x34gfx.pck
+compressed_tess0000thenE000	incbin "output/tess.pck"
+;compressed_titlescr			incbin titlescr.pck
+				
+length equ $-#170
+
+		display " "
+		display "-crafted.      (bas) @ ",#170
+		display "tess.pck             @ ",compressed_tess0000thenE000
+		display "(up to)              @ ",#170+length
+		display "                     = ",/D,(length+#80+1023)/1024,"Kb"
+		display " "
+		display "0x0000..",length_tess0000.bin
+		display "0x8000..",length_tess8000.bin
+		display "0xE000..",length_tessE000.bin
+		display " "
+		display ddeexo,"..",ddeexo_ends, " ddeexo beware cos' then used again in main code"
+		display "0xF34A..0xF400 <----------- CHANGE tess_jp_adr UNTIL GETTING THIS ON PREVIOUS LINE"
+		display " "
+		

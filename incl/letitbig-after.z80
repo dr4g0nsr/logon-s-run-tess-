@@ -1,0 +1,256 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+letitbig.after.script0.init
+			;
+			; XOR la led
+			;
+				ld hl,inter.line_13_2.gameboy:ld (inter.line_13_2.gameboy_fix+1),hl ; nécessaire pour la led rouge
+				call letitbig.after.gen_spr_lgn
+				call letitbig.mod_led.on_off
+				; sauvé, avec le fond ahah!
+					call sys.7FC1_3.backup
+						call letitbig.after.backup_background
+					call sys.7FC1_3.restore
+					ld hl,letitbig.after.backup_bg_temp
+					ld de,letitbig.after.backup_bg
+					ld bc,69*22:ldir
+				call letitbig.after.put_with_bg.init
+			ld de,letitbig.after.script0.ends:ld bc,4:jp sys.put_call_at_VBL_wo_call
+letitbig.after.script0.ends
+			;
+			; XOR 2+1 lignes
+			;
+				call letitbig.mod_barlines
+			ld de,letitbig.after.script1.ends:ld bc,4:jp sys.put_call_at_VBL_wo_call
+letitbig.after.script1.ends
+			;
+			; XOR 2+1 lignes
+			;
+				call letitbig.mod_barlines
+			ld hl,letitbig.after.main_script:ld de,letitbig.after.main_script.ends:ld bc,4*15:jp sys.put_call_at_VBL
+letitbig.after.main_script
+			;
+			; logon scroll vers le bas
+			;
+				ld a,0:inc a:and 3:ld ($-4),a:ret nz
+				call letitbig.after.put_with_bg 
+letitbig.after.main_script.adr_to_data_adr
+				ld hl,letitbig.after.main_script.data_adr
+				ld e,(hl):inc hl:ld d,(hl):inc hl:ld (letitbig.after.main_script.adr_to_data_adr+1),hl
+				ld (letitbig.after.put_with_bg.adr_lgn+1),de
+			ret
+letitbig.after.main_script.ends 
+ 			ld hl,letitbig.after.spr_msk+21*18:ld (letitbig.after.put_with_bg.adr_spr_msk+1),hl
+			ld hl,letitbig.after.main_script2:ld de,letitbig.after.main_script2.ends:ld bc,4*(34-11)+1:jp sys.put_call_at_VBL
+letitbig.after.main_script2
+				ld a,1:inc a:and 3:ld ($-4),a:ret nz
+				call letitbig.after.put_with_bg 
+				ld hl,(letitbig.after.put_with_bg.adr_scr+1)
+				call letitbig.misc.next_scanline
+				ex de,hl
+				ld hl,(letitbig.after.put_with_bg.adr_bg+1)
+				ld bc,22:add hl,bc
+				ld a,-1:inc a:cp 3:jr nz,2+$+2:ld a,0:ld ($-8),a
+				jr nz,letitbig.after.main_script2.jr0
+				ld a,(letitbig.after.put_with_bg.adr_lgn+2) ; poids fort /// letitbig.after.spr_lgn+#400*...
+				add a,4:cp high (letitbig.after.spr_lgn+#400*4):jr nz,2+$+2:ld a,high letitbig.after.spr_lgn
+				ld (letitbig.after.put_with_bg.adr_lgn+2),a
+				jr nz,2+$+2:inc hl:inc de			
+letitbig.after.main_script2.jr0
+				ld (letitbig.after.put_with_bg.adr_bg+1),hl
+				ld (letitbig.after.put_with_bg.adr_scr+1),de
+			ret
+letitbig.after.main_script2.ends
+			;ld hl,sys_ret:ld de,letitbig.after.ends1:ld bc,timing_gb_with_logo:call sys.put_call_at_VBL
+ ; fait en 2 fois maintenant parce que pas compatible avec la création du final "8BIT" fullscreen?
+			; enlève le logo (prépa)
+			ld hl,letitbig.after.spr_lgn:ld (letitbig.after.put_with_bg.adr_lgn+1),hl
+			ld hl,letitbig.after.spr_lgn:xor a:ld (hl),a:inc l:jr nz,$-2:inc h:ld (hl),a:inc l:jr nz,$-2:inc h:ld (hl),a:inc l:jr nz,$-2			
+			call letitbig.after.put_with_bg.wo_int_to_put
+			ret
+letitbig.after.ends1 
+			;
+			; XOR la led
+			;
+			call letitbig.mod_led.on_off
+			; enlève le logo (put)
+			call letitbig.after.int_to_put
+			;
+			ld de,letitbig.after.ends2:ld bc,4:jp sys.put_call_at_VBL_wo_call
+letitbig.after.ends2
+			;
+			; XOR 2+1 lignes
+			;
+				call letitbig.mod_barlines
+			ld de,letitbig.after.ends3:ld bc,4:jp sys.put_call_at_VBL_wo_call
+letitbig.after.ends3
+			;
+			; XOR 2+1 lignes
+			;
+				call letitbig.mod_barlines
+			ld de,letitbig.after.ends4:ld bc,4:jp sys.put_call_at_VBL_wo_call
+letitbig.after.ends4
+			call sys.zik_at_6
+ 			ld a,#3E:ld (inter.line_32_6.gameboy.fix_scroll_r2),a
+			ld hl,letitbig.after.call5:ld de,letitbig.after.ends5:ld bc,8:jp sys.put_call_at_VBL
+letitbig.after.call5
+			;
+			; scroll par R2
+			;
+			ret
+letitbig.after.ends5
+ 			ld a,#18:ld (inter.line_32_6.gameboy.fix_scroll_r2),a
+			ld a,1:ld (scroller.inc_scr+1),a
+			; vide bg col
+			ld hl,deulignes.put_bg_char1+1:ld de,4:ld c,%11110000
+			ld b,8*2:ld (hl),c:add hl,de:djnz $-2
+			inc hl:inc hl
+			ld b,8*2:ld (hl),c:add hl,de:djnz $-2
+			; ajuste bg col 
+			ld a,32*2:ld (deulignes.put_bg.next_charline.fix1+1),a
+			xor a:ld (deulignes.put_bg.next_charline.fix2+1),a				 
+			ld a,32/2:ld (deulignes.put_bg_col.fix1+2),a
+			ld hl,#0000:ld (deulignes.put_bg_col.fix2+1),hl
+			;
+			ld hl,letitbig.after.call6:ld de,letitbig.after.ends6:ld bc,32:jp sys.put_call_at_VBL
+letitbig.after.call6
+			;
+			; scroll par R13
+			;
+			jp deulignes.put_bg_col	
+letitbig.after.ends6
+			; interruption avec les rasters normaux
+			ld hl,inter.line_06_6:ld (inter.line_06_6.gameboy_fix+1),hl:ld a,l:ld (sys.wait_int_vbl_is_over_djnz+1),a
+			ld hl,inter.line_13_2:ld (inter.line_13_2.gameboy_fix+1),hl
+			ld hl,inter.line_19_6:ld (inter.line_19_6.gameboy_fix+1),hl
+			ld hl,inter.line_26_2:ld (inter.line_26_2.gameboy_fix+1),hl
+			;			;
+			call sys.zik_at_1
+			;
+			ld a,RGB000:ld (sys.ink0val),a
+			;
+			ld de,final.put_call_at_VBL:ld bc,1:jp sys.put_call_at_VBL_wo_call						
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.after.main_script.data_adr
+			;dw letitbig.after.spr_lgn+#400*( 1 )+18*15+1
+			dw letitbig.after.spr_lgn+#400*( 1 )+18*14+1
+			dw letitbig.after.spr_lgn+#400*( 1 )+18*13+1
+			dw letitbig.after.spr_lgn+#400*( 2 )+18*12+1
+			dw letitbig.after.spr_lgn+#400*( 2 )+18*11+1
+			dw letitbig.after.spr_lgn+#400*( 2 )+18*10+1
+			dw letitbig.after.spr_lgn+#400*( 3 )+18* 9+1
+			dw letitbig.after.spr_lgn+#400*( 3 )+18* 8+1
+			dw letitbig.after.spr_lgn+#400*( 3 )+18* 7+1
+			dw letitbig.after.spr_lgn+#400*( 0 )+18* 6+0
+			dw letitbig.after.spr_lgn+#400*( 0 )+18* 5+0
+			dw letitbig.after.spr_lgn+#400*( 0 )+18* 4+0
+			dw letitbig.after.spr_lgn+#400*( 1 )+18* 3+0
+			dw letitbig.after.spr_lgn+#400*( 1 )+18* 2+0
+			dw letitbig.after.spr_lgn+#400*( 1 )+18* 1+0
+			dw letitbig.after.spr_lgn+#400*( 2 )+18* 0+0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.after.put_with_bg
+				call letitbig.after.put_with_bg.wo_int_to_put
+letitbig.after.int_to_put
+				ld hl,inter.ends_but_do_logo:ld (inter.line_26_2.gameboy_logo_fix+1),hl
+			ret
+letitbig.after.put_with_bg.wo_int_to_put
+ 					ld de,letitbig.after.spr_gen ; génération du code
+letitbig.after.put_with_bg.adr_bg
+					ld hl,letitbig.after.backup_bg ; backup du background
+					ld b,high rot.tab.mask			
+					exx
+letitbig.after.put_with_bg.adr_spr_msk
+					ld hl,letitbig.after.spr_msk ; mask du bord de l'écran
+letitbig.after.put_with_bg.adr_lgn
+					;ld de,letitbig.after.spr_lgn+#300*2
+					ld de,letitbig.after.spr_lgn+#400*(2-1)+18*15+1
+letitbig.after.put_with_bg.adr_scr
+					ld bc,#1151 ; écran
+					ld ixh,35
+letitbig.after.put_with_bg.loop_n_lines
+							;exx:ld a,#21:ld (de),a:inc de:exx ; temporaire, sera généré avant 1 fois pour toute  <-----------
+						ld a,c:exx:inc de:ld (de),a:inc de:exx
+						ld a,b:exx:ld (de),a:inc de:exx
+						ld ixl,18
+letitbig.after.put_with_bg.loop_within_line
+								ld a,(de):inc de ; sprite logon décalé
+								and (hl):inc hl ; mask de l'écran
+							exx	
+								ld c,a ; sprite 1er plan
+									inc de;ld a,#36:ld (de),a:inc de ; temporaire, sera généré avant 1 fois pour toute  <-----------
+								ld a,(bc) ; mask
+								and (hl):inc hl ; sprite background <- à poker en LD A,(HL) pour restauration
+letitbig.after.put_with_bg.fix_pen0
+								or c ; background maské OR 1er plan <- à poker en NOP pour encre 0							
+								ld (de),a:inc de ; stocké
+									inc de;ld a,#23:ld (de),a:inc de ; temporaire, sera généré avant 1 fois pour toute  <-----------
+							exx
+						dec ixl:jr nz,letitbig.after.put_with_bg.loop_within_line ; ixl largeur
+						call letitbig.misc.next_scanline_bc
+						exx:inc hl:inc hl:inc hl:inc hl:exx
+					dec ixh:jr nz,letitbig.after.put_with_bg.loop_n_lines ; ixh hauteur
+					;exx:ld a,#C9:ld (de),a  ; temporaire, sera généré avant 1 fois pour toute <-----------
+ 			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.after.gen_spr_lgn
+						ld de,letitbig.after.spr_lgn+#400*0
+						ld c,0
+						call letitbig.after.gen_spr_lgn.spr_once:call letitbig.after.gen_spr_lgn.rr_spr
+						call letitbig.after.gen_spr_lgn.spr_once:call letitbig.after.gen_spr_lgn.rr_spr
+						call letitbig.after.gen_spr_lgn.spr_once:call letitbig.after.gen_spr_lgn.rr_spr
+						call letitbig.after.gen_spr_lgn.spr_once
+						ld hl,letitbig.lgn_data+#13B:ld b,9*21:call letitbig.after.gen_spr_lgn.loop0
+						ld c,%11110000
+						call letitbig.after.gen_spr_lgn.spr_once.lol-3:jr letitbig.after.gen_spr_lgn.spr_once.lol+1					
+letitbig.after.gen_spr_lgn.spr_once
+							ld hl,letitbig.lgn_data
+							ld b,#13B-#100
+							call letitbig.after.gen_spr_lgn.loop0				
+							call letitbig.after.gen_spr_lgn.loop0
+							call letitbig.after.gen_spr_lgn.spr_once.lol				
+letitbig.after.gen_spr_lgn.spr_once.lol
+							ld a,c:ld (de),a:inc e:jr nz,$-2:inc d
+						ret
+letitbig.after.gen_spr_lgn.loop0	ld a,(hl):and %11110000:								ld (de),a:inc de
+									ld a,(hl):and %00001111:add a,a:add a,a:add a,a:add a,a:ld (de),a:inc de
+									inc hl
+									djnz letitbig.after.gen_spr_lgn.loop0
+								ret
+letitbig.after.gen_spr_lgn.rr_spr
+							ld hl,letitbig.lgn_data
+							xor a:ex af,af ; flag
+							ld b,#13B-#100
+							call letitbig.after.gen_spr_lgn.loop1 	
+letitbig.after.gen_spr_lgn.loop1	ex af,af:ld a,(hl):rra:ld (hl),a:ex af,af
+									inc hl
+									djnz letitbig.after.gen_spr_lgn.loop1
+								ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+letitbig.after.put_with_bg.init
+					ld hl,letitbig.after.spr_gen ; génération du code
+					ld bc,#2136
+					ld a,#23
+					ld ixh,35
+letitbig.after.put_with_bg.init.loop_n_lines
+						ld (hl),b:inc hl ; #21
+						inc hl
+						inc hl
+						ld ixl,18
+letitbig.after.put_with_bg.init.loop_within_line
+							ld (hl),c:inc hl ; #36
+							inc hl
+							ld (hl),a:inc hl ; #23
+						dec ixl:jr nz,letitbig.after.put_with_bg.init.loop_within_line ; ixl largeur
+					dec ixh:jr nz,letitbig.after.put_with_bg.init.loop_n_lines ; ixh hauteur
+					ld (hl),#C9
+ 			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ 							

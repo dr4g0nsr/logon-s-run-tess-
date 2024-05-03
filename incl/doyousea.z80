@@ -1,0 +1,468 @@
+
+
+
+
+
+
+
+		
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; vagues
+doyousea_261_precalc
+s_nb=261
+s_nbx=14; trouvable en limitant le nb de steps affichés
+s_nby=195 ; trouvable en limitant le nb de steps affichés
+			ld hl,scroller.51n261
+				call scroller.init
+			ld hl,#EC3+#800+13*51*2  
+				;#EC3+#800 précédemment pour ne pas aller sur les qlq 25 ko affichés (?)
+				ld (scroller.o),hl
+			ld hl,square261.store_steps
+			ld bc,s_nbx
+				call scroller.tabvar.init
+			call tess_doyousea_261.common
+agx = (#10000/s_nb)*7							
+		 	ld hl,#0000:ld bc,agx:ld de,s_nbx:ld a,8
+		 		call @sys.calc.sinus1.init
+agy = (#10000/s_nb)*5
+		 	ld hl,#4000:ld bc,agy:ld de,s_nbx:ld a,12
+		 		call @sys.calc.sinus2.init
+			ld bc,s_nb
+			ld ix,square261.store_pts
+doyousea.loop9	push bc
+	 						;ld hl,#0000+#100*0:ld de,((0)*agx) mod #10000:call @sys.calc.sinus1delta
+							call @sys.calc.sinus1:ex de,hl
+							ld hl,(@rot.dx_center_iso+1):add hl,de
+	 							ld (ix+0),l:ld (ix+1),h
+	 						;ld hl,#00000-#100*0:ld de,((0)*agy) mod #10000:call @sys.calc.sinus2delta
+	 						call @sys.calc.sinus2:ex de,hl
+							ld hl,(@rot.dx_center_iso+1):or a:sbc hl,de
+	 							ld (ix+2),l:ld (ix+3),h
+	 						;
+	 						ld hl,#0000+#100*24:ld de,((s_nbx)*agx) mod #10000:call @sys.calc.sinus1delta
+	 							ld (ix+4),l:ld (ix+5),h
+	 						ld hl,#0000+#100*7:ld de,((s_nbx)*agy) mod #10000:call @sys.calc.sinus2delta
+	 							ld (ix+6),l:ld (ix+7),h
+	 						;
+	 						ld hl,#0000+#100*24:ld de,((s_nby+s_nbx)*agx) mod #10000:call @sys.calc.sinus1delta
+	 							ld (ix+8),l:ld (ix+9),h
+	 						ld hl,#10000+#100*(7-24):ld de,((s_nby+s_nbx)*agy) mod #10000:call @sys.calc.sinus2delta
+	 							ld (ix+10),l:ld (ix+11),h
+	 						;
+	 						ld hl,#0000+#100*0:ld de,((s_nby)*agx) mod #10000:call @sys.calc.sinus1delta
+	 							ld (ix+12),l:ld (ix+13),h
+	 						ld hl,#10000+#100*(-24):ld de,((s_nby)*agy) mod #10000:call @sys.calc.sinus2delta
+	 							ld (ix+14),l:ld (ix+15),h
+	 						;
+	 						ld bc,#10:add ix,bc
+				pop bc:dec bc:ld a,b:or c:jp nz,doyousea.loop9	
+		ret
+doyousea_261_halfdraw
+			ld hl,doyousea.square_tab.unseen
+				call doyousea_261_draw
+			ld a,11:ld (doyousea.square_nbl+1),a			
+			ld hl,doyousea.square_tab.unseen.last
+				call doyousea.square_call	
+			ld a,10:ld (doyousea.square_nbl+1),a	
+		ret
+doyousea_261_lastdraw
+			ld hl,doyousea.square_tab.seen
+doyousea_261_draw
+			push hl
+				call tess_doyousea_261.common
+				ld hl,square261.store_steps
+				ld bc,14*14*6;10
+				ld de,261*6;10
+					call scroller.tabvar.restore
+			pop hl
+		jp doyousea.square_call
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tess_doyousea_261.common
+			ld hl,tab.pts.square
+				call @rot.reset.pts_then_object
+			call scroller.init.default_zeros
+			call scroller.proj_backup.init
+			ld b,%10100000 ; 1010
+		jp @rot.gen.trans_ink
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.square_call	
+doyousea.square_tab_loop
+					ld c,(hl):inc hl:ld b,(hl):inc hl			
+					ld a,b:and c:inc a:ret z
+					ld e,(hl):inc hl:ld d,(hl):inc hl
+					push hl
+						ex de,hl
+						ld (scroller.tabvar.nextstep+1),bc
+doyousea.square_nbl		ld a,10
+doyousea.square_loop	push af
+							push hl							
+								ld bc,square261.store_pts:add hl,bc
+								ld de,@rot.tab.pts_proj.backup:ld bc,#10:ldir
+				 				call scroller.proj_backup.to_screen_once
+							pop hl
+							ld bc,#10*14:add hl,bc
+							ld bc,#10*s_nb:or a:sbc hl,bc:jr nc,2+$+1
+								add hl,bc
+						pop af
+						dec a:jr nz,doyousea.square_loop 
+					pop hl
+				jr doyousea.square_tab_loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	macro sqtab sqx,sqy
+;	dw 10*(((sqx*57+sqy*14)*14) mod 261) : dw #10*((sqx*57+sqy*14) mod 261)
+	dw 6*(((sqx*57+sqy*14)*14) mod 261) : dw #10*((sqx*57+sqy*14) mod 261)
+	endm
+doyousea.square_tab.seen
+	sqtab 0,0
+	sqtab 1,0
+	sqtab 2,0
+	sqtab 3,0
+	sqtab 4,0
+	sqtab 5,1
+	sqtab 6,1
+	sqtab 7,1
+	sqtab 8,1
+	sqtab 9,2
+	sqtab 10,2
+	sqtab 11,2
+	sqtab 12,2
+	dw #FFFF	
+doyousea.square_tab.unseen
+	sqtab 5,11
+	sqtab 6,11
+	sqtab 7,11
+	sqtab 8,11
+	sqtab 9,12
+	sqtab 10,12
+	sqtab 11,12
+	sqtab 12,12
+	sqtab 0,10
+	sqtab 1,10
+	sqtab 2,10
+	sqtab 3,10
+	dw #FFFF	
+doyousea.square_tab.unseen.last
+	sqtab 4,10
+	dw #FFFF	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; ligne oblique
+doyousea_401_precalc
+s_nb=401
+s_nbr=386
+s_nbx=15
+s_nby=321
+			ld hl,scroller.51n401
+				call scroller.init
+			ld hl,#D0E+#800+13*51*2  ; précédemment sans 13*51*2 
+				ld (scroller.o),hl
+ 			ld hl,doyousea401.store_steps
+ 			ld bc,s_nbr
+ 				jp scroller.tabvar.init
+; 			call tess_doyousea_401.common
+; 			ld hl,doyousea.line_tab_unseen
+; 				call doyousea.line_tab_call
+;		ret
+doyousea_401_halfdraw
+			ld hl,doyousea.line_tab_unseen
+			jr doyousea_401_draw
+doyousea_401_lastdraw
+			ld hl,doyousea.line_tab_seen
+doyousea_401_draw
+			push hl
+				call tess_doyousea_401.common
+				ld hl,doyousea401.store_steps
+				ld bc,s_nbr*6;10
+				ld de,s_nb*6;10
+					call scroller.tabvar.restore
+			pop hl
+		jp doyousea.line_tab_call
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tess_doyousea_401.common
+			ld hl,tab.pts.ligne_oblique				
+				call @rot.reset.pts_then_object
+			call scroller.init.default_zeros
+			ld hl,#880:ld (rot.az_16bits),hl
+			ld hl,53:ld (rot.mulu),hl
+				call scroller.proj_backup.init
+			ld b,%01010000 ; 0101
+		jp @rot.gen.trans_ink
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.line_tab_call
+doyousea.line_tab_loop
+			ld a,(hl):or a:ret z
+            ld c,a:ld b,0:inc hl
+			ld e,(hl):inc hl:ld d,(hl):inc hl
+			ld (scroller.tabvar.nextstep+1),de
+			push hl
+				call scroller.proj_backup.to_screen.same_HL.wo_BC
+			pop hl
+			jr doyousea.line_tab_loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	macro ltab lnnb,lnx,lny
+	db lnnb
+;	dw 10*((lnx*15+lny*321) mod 401)
+	dw 6*((lnx*15+lny*321) mod 401)
+	endm
+doyousea.line_tab_seen	
+	ltab 70,0,0
+	ltab 65,0,1
+	ltab 66,5,2
+	db 0	
+doyousea.line_tab_unseen	
+	ltab 69,10,15
+	ltab 69,15,16
+	ltab 62,19,17
+	db 0	
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; flotteur/bateau
+doyousea_151_precalc
+s_nb=151
+s_nbx=15; trouvable en limitant le nb de steps affichés
+s_nby=101 ; trouvable en limitant le nb de steps affichés
+			ld hl,	 scroller.51n151
+				call scroller.init
+			ld hl,#1F78+#800+13*51*2  ; précédemment etc
+				ld (scroller.o),hl
+			ld hl,doyousea.store_steps
+			ld bc,s_nbx
+		jp scroller.tabvar.init
+doyousea_151_halfdraw
+			call tess_doyousea_151.common
+ 			ld bc,24+256*28	
+ 				call doyousea.boat_call
+ 			ld bc,23+256*79	
+ 				call doyousea.boat_call
+ 			ld bc,20+256*131	
+ 		jp doyousea.boat_call
+doyousea_151_lastdraw
+			call tess_doyousea_151.common
+ 			ld bc,28+256*0	
+ 				call doyousea.boat_call
+ 			ld bc,27+256*52	
+ 				call doyousea.boat_call
+ 			ld bc,29+256*102	
+ 		jp doyousea.boat_call
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tess_doyousea_151.common
+			ld hl,tab.pts.doyousea
+				call @rot.reset.pts_then_object
+			ld b,%10100101 	; 1212   
+			ld c,%11111111 	; 3333
+			ld d,%10101111 	; 3232  
+				call @rot.gen.trans_ink
+	ld hl,doyousea.store_steps
+	ld bc,s_nbx*6;10
+	ld de,s_nb*6;10
+	jp scroller.tabvar.restore
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.boat_reset
+agx = (#10000/s_nb)*2							
+agy = (#10000/s_nb)*3
+			; init var
+			ld hl,#0000:ld bc,agx:ld de,s_nbx:ld a,15
+				call scroller.init.sinus_dx
+			ld hl,#4000:ld bc,agy:ld de,s_nbx:ld a,10
+				call scroller.init.sinus_dy
+			ld hl,#0000
+				ld (doyousea.calc.ax+1),hl
+			; constants
+			ld hl,#1000
+				ld (rot.ay_16bits),hl
+			ld hl,#0A00
+				ld (rot.az_16bits),hl
+			ld hl,128
+				ld (rot.mulu),hl ; 128 is fine to have exactly scake set by data points
+			; special call
+			ld hl,doyousea.calc ; special call for updating parameters
+				ld (scroller.calc.call_spec+1),hl
+			; offset for scroller
+			ld hl,0
+				ld (scroller.tabvar.nextstep+1),hl
+		ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.boat_call
+			ld hl,doyousea.pre_modify:ld (scroller.pre_modify+1),hl
+			push bc
+				call doyousea.boat_reset
+			pop bc
+			push bc
+				ld a,b:or a:jr z,doyousea.boat_call.noloop
+doyousea.boat_call.loop
+				push bc
+					call doyousea.calc
+					call scroller.nextstep
+				pop bc:djnz doyousea.boat_call.loop
+doyousea.boat_call.noloop
+			pop bc:ld b,0 ; nb of loops
+				call scroller.direct_to_screen.loop
+   			ld hl,#FFFE:ld (tab.pts.doyousea.fix_last_step),hl
+   				call rot.gen.sides_full
+   			ld bc,1
+   				call scroller.direct_to_screen.loop
+   			ld hl,2+256*3
+   				ld (tab.pts.doyousea.fix_last_step),hl
+   				call rot.gen.sides_full
+			;
+			ld hl,scroller.modify.return:ld (scroller.pre_modify+1),hl
+		ret		
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.calc
+s_nb=151
+s_nbx=15; trouvable en limitant le nb de steps affichés
+s_nby=101 ; trouvable en limitant le nb de steps affichés
+					call scroller.calc.sinus_dx
+					call scroller.calc.sinus_dy
+doyousea.calc.ax		ld hl,#0000
+						ld bc,#10000/s_nb*s_nbx:add hl,bc:ld (doyousea.calc.ax+1),hl
+						push hl							
+							call @sys.sinus_16bits
+						pop de
+						add hl,de
+						ld de,#2000:add hl,de
+							ld (rot.ax_16bits),hl
+				ret			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+doyousea.pre_modify
+				ld ix,@rot.tab.pts_proj+9*4
+					ld hl,#0000+#100*7:ld de,((0)*agx) mod #10000:call @sys.calc.sinus1delta
+						ld (ix+0),l:ld (ix+1),h
+					ld hl,#0000+#100*(4):ld de,((0)*agy) mod #10000:call @sys.calc.sinus2delta
+						ld (ix+2),l:ld (ix+3),h
+					;
+					ld hl,#0000+#100*42:ld de,((s_nbx)*agx) mod #10000:call @sys.calc.sinus1delta
+						ld (ix+4),l:ld (ix+5),h
+					ld hl,#0000+#100*(14):ld de,((s_nbx)*agy) mod #10000:call @sys.calc.sinus2delta
+						ld (ix+6),l:ld (ix+7),h
+					;
+					ld hl,#0000+#100*41:ld de,((s_nbx)*agx) mod #10000:call @sys.calc.sinus1delta
+						ld (ix+8),l:ld (ix+9),h
+					ld hl,#0000+#100*(11):ld de,((s_nbx)*agy) mod #10000:call @sys.calc.sinus2delta
+						ld (ix+10),l:ld (ix+11),h
+					;
+					ld hl,#0000+#100*6:ld de,((0)*agx) mod #10000:call @sys.calc.sinus1delta
+						ld (ix+12),l:ld (ix+13),h
+					ld hl,#0000+#100*(2):ld de,((0)*agy) mod #10000:call @sys.calc.sinus2delta
+						ld (ix+14),l:ld (ix+15),h
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+tab.pts.doyousea
+al=16
+alb=10
+ah=12
+aal=64
+aah=64
+aml=4
+amh=26
+adl=18
+adh=14
+;pts
+				;0-8
+				defb  -al,-ah,-al
+				defb  -alb, ah,-alb
+				defb   alb, ah,-alb
+				defb   al,-ah,-al
+				defb  -al,-ah, al
+				defb  -alb, ah, alb
+				defb   alb, ah, alb
+				defb   al,-ah, al
+				defb 0,0,0
+				;9-13
+aaa=7
+aaah=3
+				defb  12,aaah,0
+				defb  14,-aaah,0
+				defb  14+aaa,-aaah,0
+				defb  12+aaa,aaah,0
+				defb  13+aaa/2,0,0
+			if 0 ; précédemment avant doyousealite
+				defb      +al,-aah,0
+				defb      +al, aah,0
+				defb   aal+al, aah,0
+				defb   aal+al,-aah,0
+				defb al,0,0
+			endif
+				;14-22
+				defb  -aml,-ah-amh,-aml
+				defb  -aml,-ah    ,-aml
+				defb   aml,-ah    ,-aml
+				defb   aml,-ah-amh,-aml
+				defb  -aml,-ah-amh, aml
+				defb  -aml,-ah    , aml
+				defb   aml,-ah    , aml
+				defb   aml,-ah-amh, aml
+				defb     0,-ah-amh/2,0
+				; 23-27
+				defb   -aml,-ah-amh,0
+				defb   -aml,-ah-amh+adh,0
+				defb   -aml-adl,-ah-amh+adh-2,0
+				defb   -aml-adl,-ah-amh+2,0
+				defb   -aml-adl/2,-ah-amh/2,0
+			defb -1 ; end of pts
+;sides
+				defb 27
+ 					defb 23,24,25,26,#80+2
+ 					defb 26,25,24,23,#80+2
+				defb -1
+				defb 22
+					defb 14+1,14+2,14+6,14+5,#80+3			
+					defb 14+7,14+4,14+5,14+6,#80+1;2
+					defb 14+3,14+0,14+4,14+7,#80+3
+					defb 14+1,14+0,14+3,14+2,#80+1;2			
+					defb 14+0,14+1,14+5,14+4,#80+2;1
+					defb 14+2,14+3,14+7,14+6,#80+2;1
+				defb -2 ; -2 pour la trame, -1 sinon 
+				defb 8 ; which pt for z ordering
+					defb 1,2,6,5,#80+3			
+					defb 7,4,5,6,#80+1
+					defb 3,0,4,7,#80+3
+					defb 1,0,3,2,#80+1			
+					defb 0,1,5,4,#80+2
+tab.pts.doyousea.fix_last_step
+					defb 2,3,7,6,#80+2
+				defb -2 ; -2 pour la trame, -1 sinon 
+ 				defb 9+4
+ 					defb 9+0,9+1,9+2,9+3,#80+2			
+ 				defb -1 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+						
+tab.pts.square
+aaa=64
+;pts
+				defb  -aaa,-aaa, 0
+				defb  -aaa, aaa, 0
+				defb   aaa, aaa, 0
+				defb   aaa,-aaa, 0
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 0,1,2,3,#80+1
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+
+
+					
+tab.pts.ligne_oblique
+aaa=64
+aab=12
+;pts
+				defb  -aaa,-aab, 0
+				defb  -aaa, aab, 0
+				defb   aaa, aab, 0
+				defb   aaa,-aab, 0
+			defb -1 ; end of pts
+;sides
+				defb 0 ; which pt for z ordering
+					defb 0,1,2,3,#80+1
+				defb -2 ; -2 pour la trame, -1 sinon 
+			defb -1 ; end of sides
+
+			

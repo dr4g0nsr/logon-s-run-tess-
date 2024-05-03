@@ -1,0 +1,476 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_tab_colora 
+		db RGB201 ; #45 ++
+	db RGB111 ; #40 +
+  db RGB002 ; #55 fut trop proche de l'ex engrenage
+ ;db RGB222 ; #4B -
+	db RGB200 ; #4C ++
+	db RGB201 ; #45 ++
+	db RGB011 ; #46 +
+	db RGB211 ; #47 ++
+	db RGB220 ; #4A -
+	db RGB201 ; #45 ++
+	db RGB001 ; #44 +
+		db RGB212 ; #4F +
+	db RGB210 ; #4E ++
+colorz_tab_colorb 
+		db RGB201 ; #45 ++
+  db RGB002 ; #55 fut trop proche de l'ex engrenage
+ ;db RGB210 ; #4E ++
+		db RGB200 ; #4C ++
+  db RGB102 ; #5D ex engrenage
+ ;db RGB110 ; #5E ++
+	db RGB022 ; #53 -
+	db RGB101 ; #58 -
+	db RGB012 ; #57 +
+		db RGB200 ; #4C ++
+	db RGB100 ; #5C ++
+ db RGB112 ; #5F fut trop proche de l'ex engrenage
+ ;db RGB010 ; #56 ++
+	db RGB212 ; #4F +
+colorz_tab_colorc 
+		db RGB210 ; #4E ++
+		db RGB001 ; #44 +
+  db RGB222 ; #4B -
+ ;db RGB110 ; #5E ++
+		db RGB201 ; #45 ++
+		db RGB012 ; #57 +
+		db RGB100 ; #5C ++
+		db RGB211 ; #47 ++
+		db RGB200 ; #4C ++
+ db RGB002 ; #55 fut trop proche de l'ex engrenage
+ ;db RGB010 ; #56 ++
+	db RGB202 ; #4D +
+		db RGB200 ; #4C ++
+		
+ ;db RGB002 ; #55 fut trop proche de l'ex engrenage
+ ;db RGB102 ; #5D ex engrenage
+ ;db RGB112 ; #5F fut trop proche de l'ex engrenage
+	
+	;db RGB010 ; #56 ++ c'est devenu l'engrenage actuel vert
+	;db RGB110 ; #5E ++ trop proche du nouvel engrenage
+				
+	;db RGB120 ; #5A trop vert vif
+	;db RGB121 ; #59 trop vert d'eau vif
+	;db RGB021 ; #42 trop vert vif
+	;db RGB020 ; #52 pas de vert vif = la tige
+	
+	;db RGB000 ; #54 pas de noir = le fond
+	
+	;db RGB002 ; #55 fut trop proche de l'ex engrenage
+	;db RGB102 ; #5D ex engrenage
+	;db RGB112 ; #5F fut trop proche de l'ex engrenage
+
+	;db RGB122 ; #5B y'a déjà un turquoise ça suffit
+
+	;db RGB221 ; #43 y'a déjà le jaune vif ça suffit
+
+		if cond.colorz
+colorz_ink equ 1
+		else
+colorz_ink equ 2
+		endif
+		
+colorz_color_body_null equ #56
+colorz_color_body_final equ #4C
+colorz_color_body_test equ #40
+dragonfly_offset_deca equ 5;7
+colorz_sync0 equ 5+dragonfly_offset_deca
+colorz_nb_colors equ 11 ; now do not change!!! some other code is based on this now...
+
+
+colorza	dw colorz_tab_a
+colorz_cpt_a equ 0
+colorzc	dw colorz_tab_c+81*8
+colorz_cpt_c equ 4
+colorzb	dw colorz_tab_b+81*8+80*8
+colorz_cpt_b equ 7
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_precalc
+		; précalcul i.e. génération des tables
+				ld hl,colorz_tab_a:ld de,colorz_tab_colora:call colorz_gen
+				ld hl,colorz_tab_b:ld de,colorz_tab_colorb:call colorz_gen
+				ld hl,colorz_tab_c:ld de,colorz_tab_colorc:call colorz_gen
+				ret
+colorz
+		; opérations afin de basculer vers le main loop
+			; wait la dernière interruption
+				call sys.wait_int_vbl_is_over
+;				ld a,#C9:ld (scroller.inc_offset),a
+				halt:halt:halt:halt:halt
+			; wait presque 5 lignes de caractères
+				ld b,90:djnz $:djnz $:djnz $ 
+			; zic!
+				call aks_regs
+			; crtc /!\ 2 splitscreens and not 3 
+				; set reg7=#12 (instead of #D)
+				; set reg6=#11 (instead of #C)
+				ld bc,#BC06:out (c),c:ld bc,#BD11:out (c),c
+			;
+				call colorz_set_crtc
+
+				ld bc,#7F00+colorz_ink
+;;;				ld hl,#0154:out (c),h:out (c),l
+				out (c),c
+				
+			; zic en temps fixe
+				ld a,aks_fix_val:ld (aks_fix_adr),a
+				ld a,#C9:ld (#FDFD),a
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_loop
+				halt
+				di
+				
+			; zic
+				call aks_play
+				
+			; synchro
+				ld b,9:djnz $:nop:nop:nop
+				;ld b,9:djnz $:nop:break
+				
+			; colorz main call
+				ld a,33*2		; nb ligne/4
+				ld hl,colorz_outbclist
+				exx
+colorz1 equ $+2:ld iy,(colorza)	; 1ère colonne tronquée
+colorz2	equ $+1:ld hl,(colorzb)	; 2nde colonne tronquée
+colorz3	equ $+2:ld ix,(colorzc)	; 3ème colonne tronquée
+				ld d,(iy+0) 		; 1ère colonne tronquée
+				ld e,(hl)			; 2nde colonne entière
+				ld b,#7F
+colorz_col1		
+				if colorz_sync0<8
+				call colorz_col1long
+				else
+				call colorz_col1short
+				endif
+							
+			; colorz move
+				call colorz_next_splitrasters
+				call colorz_cpt_update
+
+			; ends?
+colorz.cpt_time		ld hl,timing_colorz:dec hl:	ld (colorz.cpt_time+1),hl
+					ld a,l:or h:jr z,colorz_event_ending
+				
+			; crtc vram offset update
+				call colorz_vram_offset_update
+					
+			; zic
+				call aks_regs
+		
+			; loop
+				ei
+				jp colorz_loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_event_ending
+				ld a,1:ld (aks_fix_adr),a
+				ld a,#C3:ld (#FDFD),a
+				ld bc,#BC06:out (c),c:ld bc,#BD0C:out (c),c ; 11+11+12, confirmé 12 dans le dernier tiers d'écran
+				ld a,(colorz.int1_12):and #33:ld h,a:ld a,(colorz.int1_13):ld l,a
+					ld (scroller.int1+1),hl;call scroller.calc_int23
+				ld a,colorz_color_body_final:ld (sys.ink2val),a
+				xor a:ld (scroller.inc_offset),a
+				ei:pop hl
+				halt
+;				ld hl,colorz.flash_at_VBL:ld bc,5:call sys.put_call_at_VBL_wo_last	
+	 			halt
+				ld bc,#BC07:out (c),c:ld bc,#BD0D:out (c),c
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_col1long
+				out (c),d	
+colorz_av_jr	jr 2+$+colorz_sync0:defs 17,0
+colorz_av_loop				;				; loop!
+				call callz	;   == 54		
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				exx			; 1				; DEC et OUT particulier
+				ld b,(hl)   ; 2
+				inc hl		; 2
+				exx			; 1 ==  6
+				call callz	;   == 54		
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				exx			; 1
+				ld c,(hl)   ; 2
+				inc hl		; 2
+				exx			; 1 ==  6
+				call callz	;   == 54		
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				exx			; 1
+				out (c),c	; 4 
+				exx			; 1 ==  6
+				call callz	;   == 54		
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				nop:nop		; 2
+				dec a		; 1
+				jr nz,colorz_av_loop
+							; 3 ==  6 avec le ex af,af
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_col1short			
+colorz_ap_jr	jr 2+$+(colorz_sync0-8):defs 9,0
+colorz_ap_loop	 			;				; loop!
+				out (c),d	;   ==  4		; OUT 1ère colonne tronqué
+				call callz	;   == 54		
+				exx			; 1				; DEC et OUT particulier
+				ld b,(hl)   ; 2
+				inc hl		; 2
+				exx			; 1 ==  6
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				call callz	;   == 54		
+				exx			; 1
+				ld c,(hl)   ; 2
+				inc hl		; 2
+				exx			; 1 ==  6
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				call callz	;   == 54		
+				exx			; 1
+				out (c),c	; 4 
+				exx			; 1 ==  6
+				out (c),d	;   ==  4		; OUT 1ère colonne tronquée
+				call callz	;   == 54		
+				nop:nop		; 2
+				dec a		; 1
+				jr nz,colorz_ap_loop
+							; 3 ==  6 avec le ex af,af
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+callz						; 5
+				defs 3,0	; 3	==	8
+				out (c),e	;   ==  4		; OUT 2nde colonne entière 
+				inc hl		; 2				 
+				ld e,(hl)	; 2
+				ld c,(ix+0)	; 5
+				inc ix		; 3
+				nop			; 1
+				out (c),c	; 4 == 17		; OUT 3ème colonne entière, action 17 après la précédente
+				ld c,(iy+8)	; 5				
+				inc iy		; 3
+				ld d,(iy+0) ; 5
+				out (c),c	; 4 == 17		; OUT 4ème colonne tronquée, action 17 après la précédente
+				defs 5,0	; 5  
+				ret			; 3 ==  8	
+							; ==== 54
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_set_crtc
+				ld hl,(scroller.int1+1) ; /!\ beware, prequisite on scroller value, near from 0 to 10 or so
+colorz_crtc_add	ld de,51*24-#400+#1000:call colorz_set_crtc_call
+					ld bc,#bc0c:out (c),c:inc b:out (c),a
+					dec b:inc c:out (c),c:inc b:out (c),l
+				ld de,51*16:call colorz_set_crtc_call
+					ld (colorz.int2_12),a:ld a,l:ld (colorz.int2_13),a
+colorz_crtc_add2 ld de,51*(24-16):call colorz_set_crtc_call
+					ld (colorz.int1_12),a:ld a,l:ld (colorz.int1_13),a
+			ret
+colorz_set_crtc_call add hl,de:bit 2,h:ld a,h:jr z,2+$+2:add a,#10-#4:ld h,a:or #C:res 2,h:ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_gen
+				if 0
+				ld de,hl:inc de
+				ld (hl),colorz_color_body_test:ld bc,colorz_lg0:ldir
+				ld (hl),colorz_color_body_null:ld bc,190*13-1-colorz_lg0:ldir
+				else
+				ld bc,colorz_nb_colors+#600
+				push hl:call colorz_put_nblocks
+				ex de,hl:pop hl:ld bc,190*(colorz_nb_colors+1)/6:ldir
+				endif
+			ret 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_put_nblocks ; input B blocks of C bars
+				ld a,c:ld (colorz_put_nblocks_nbars+2),a
+colorz_put_nblocks_loop
+					push bc
+colorz_put_nblocks_nbars push de:ld b,5:call colorz_put_nbar:pop de
+					pop bc:djnz colorz_put_nblocks_loop
+			ret				
+								
+colorz_put_nbar ; input B, DE for colortab, generates at (HL)
+				ld a,(de):ld c,a:inc de
+				push bc:call colorz_put_1bar:pop bc:djnz colorz_put_nbar
+			ret
+			
+colorz_put_1bar ; input C=color			
+colorz_lg		push hl:ld hl,colorz_tab_lg-1:inc hl
+				ld a,low (colorz_tab_lg+6):cp l:jr nz,2+$+3:ld hl,colorz_tab_lg
+				ld (colorz_lg+2),hl:ld b,(hl):pop hl
+					ld (hl),c:inc hl:djnz $-2
+			ret 	
+colorz_lg0	equ 35
+colorz_lg1	equ 38
+colorz_lg2	equ 29
+colorz_lg3	equ 28
+colorz_lg4	equ 29
+colorz_lg5	equ 31
+colorz_tab_lg	db colorz_lg0,colorz_lg1,colorz_lg2,colorz_lg3,colorz_lg4,colorz_lg5
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;t=0       1       2       3       4                30,5  31      32      33      34
+				;;      >4      >D      >C      >7                   ei        >4      >D      >C
+				;;      vv   D  vv   C  vv   7  vv                   vv        vv   D  vv   C  vv
+				;;      vv  vv  ??  vv  ??  vv  vv                   vv        vv  vv  ??  vv  ??
+; too small table to generate, better store it
+colorz_outbclist	db #BC,#04,#BD,#0F,#BC,#0D,#BD,#BC,#BC,#0C,#BD,#BC,#BC,#07,#BD,#13
+					defs 26*2*2-2,#BC:db #7F,#9D
+colorz_fix_mode equ $-1
+					db #BC,#04,#BD,#16,#BC,#0D,#BD,#BC,#BC,#0C,#BD,#BC
+					db #BC,#BC
+					defs 4,#BC ; ajout d'une ligne de caractère précédemment enlevée
+colorz.int1_12 equ colorz_outbclist+4*32+3	
+colorz.int1_13 equ colorz_outbclist+4*31+3	
+colorz.int2_12 equ colorz_outbclist+4*02+3			
+colorz.int2_13 equ colorz_outbclist+4*01+3	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; 24*8=192 -2=190
+;	
+; au bout de 10 itération de scroll
+;		un motif a monté d'une moitié vers la gauche en tournant
+;		le motif juste dessous, en 10 coups, devient comme le 1er, moitié plus bas
+;		à ce moment, switcher de table: 
+;			revenir à une comme la 1ère, avec des octets devant
+;			mais les valeurs des couleurs avancent dans l'autre sens
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_next_splitrasters
+colorz_scroller.dcxm equ 22
+colorz_scroller.n_neg equ -61
+colorz_scroller.dxm equ 2
+colorz_sx_addx equ 1
+	; cxm =+ dcxm
+colorz_scroller.cxm	
+			ld hl,0
+			ld de,colorz_scroller.dcxm
+			add hl,de
+	; if cxm >= n
+			ld de,colorz_scroller.n_neg
+			add hl,de ; ajout de son negatif
+	; then
+	;       'faudra in-de/crementer xm'
+			push af ; if c then inc/dec
+	;		cxm =- n
+			jr c,2+$+1+2
+			or a
+			sbc hl,de
+			ld (colorz_scroller.cxm+1),hl
+	; xm =+ dxm 
+colorz_scroller.xm	
+			ld a,0
+			ld e,a
+			ld a,colorz_scroller.dxm
+			add a,e
+			ld e,a
+	;     -(-1) 'si faut incrementer' ou -(1) si sx=-1
+			pop af
+			ld a,e
+			jr nc,2+$+2
+			sub colorz_sx_addx
+	; if xm >=4
+			bit 2,a
+	; then
+	;		'faudra incrementer o'
+	;		xm =- 4
+			res 2,a
+			ld (colorz_scroller.xm+1),a
+				ret nz
+colorz_inchla	ld a,0
+				xor 1
+				ld (colorz_inchla+1),a
+				ret z
+colorz_incjp	
+				if colorz_sync0<8
+				jp colorz_inc_av				
+				else
+				jp colorz_inc_ap				
+				endif
+colorz_inc_av		ld a,(colorz_av_jr+1):inc a:and 7:ld (colorz_av_jr+1),a
+					ret nz
+						xor a:ld (colorz_ap_jr+1),a
+						ld hl,colorz_inc_ap:ld (colorz_incjp+1),hl
+						ld hl,colorz_col1short:ld (colorz_col1+1),hl
+						ret
+colorz_inc_ap		ld a,(colorz_ap_jr+1):inc a:cp 9:jr z,2+$+4
+					ld (colorz_ap_jr+1),a
+					ret
+						xor a:ld (colorz_av_jr+1),a
+						ld hl,colorz_inc_av:ld (colorz_incjp+1),hl
+						ld hl,colorz_col1long:ld (colorz_col1+1),hl
+					; cycle 1<--2<--3<--1
+						ld hl,(colorz1):ex de,hl
+						ld hl,(colorz2):ld (colorz1),hl
+						ld hl,(colorz3):ld (colorz2),hl
+						ex de,hl:ld (colorz3),hl
+						ld c,(hl):inc hl:ld b,(hl)
+					; avec décalage 8 pour la 3ème colonne
+						ex de,hl:ld hl,8:add hl,bc: ; pas besoin de checker la fin de table, marge de +8 mise
+						ex de,hl:ld (hl),d:dec hl:ld (hl),e
+					; 1 fois sur 2 (... par fix!?)
+colorz_fix				ld a,0:xor 1:ld (colorz_fix+1),a:ret z
+					; décale de 1 la colonne qui vient de cycler
+							ld a,low colorza:cp l:jr nz,2+$+3:ld de,colorz_cpt10_a+1
+							ld a,low colorzb:cp l:jr nz,2+$+3:ld de,colorz_cpt10_b+1
+							ld a,low colorzc:cp l:jr nz,2+$+3:ld de,colorz_cpt10_c+1
+							ld a,(de):add a,-1:ld (de),a
+							ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_vram_offset_update
+colorz_crtc_addbis	ld bc,51*24-#400+#1000
+					ld de,#100C
+					ld a,(colorz.int1_13)	; low
+					add a,c
+					ld (colorz.int1_13),a
+					ld a,(colorz.int1_12)	; high
+					res 2,a
+					adc a,b
+					bit 2,a
+					jr z,2+$+1:add a,d
+					or e
+					ld (colorz.int1_12),a
+					ld a,(colorz.int2_13)	; low
+					add a,c
+					ld (colorz.int2_13),a
+					ld a,(colorz.int2_12)	; high
+					res 2,a
+					adc a,b
+					bit 2,a
+					jr z,2+$+1:add a,d
+					or e
+					ld (colorz.int2_12),a
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+colorz_cpt_update
+colorz_cpt10_a 		ld a,colorz_cpt_a:inc a:sub 10:ld de,-26+190*(colorz_nb_colors+1)/6:jr nc,2+$+5
+						add a,10:ld de,2
+					ld (colorz_cpt10_a+1),a
+					ld hl,(colorza):add hl,de
+						ld de,190*colorz_nb_colors:ld bc,colorz_tab_a
+						or a:sbc hl,bc:sbc hl,de:jr nc,2+$+1:add hl,de:add hl,bc
+					ld (colorza),hl	
+colorz_cpt10_b 		ld a,colorz_cpt_b:inc a:sub 10:ld de,-26+190*(colorz_nb_colors+1)/6:jr nc,2+$+5
+						add a,10:ld de,2
+					ld (colorz_cpt10_b+1),a
+					ld hl,(colorzb):add hl,de
+						ld de,190*colorz_nb_colors:ld bc,colorz_tab_b
+						or a:sbc hl,bc:sbc hl,de:jr nc,2+$+1:add hl,de:add hl,bc
+					ld (colorzb),hl	
+colorz_cpt10_c 		ld a,colorz_cpt_c:inc a:sub 10:ld de,-26+190*(colorz_nb_colors+1)/6:jr nc,2+$+5
+						add a,10:ld de,2
+					ld (colorz_cpt10_c+1),a
+					ld hl,(colorzc):add hl,de
+						ld de,190*colorz_nb_colors:ld bc,colorz_tab_c
+						or a:sbc hl,bc:sbc hl,de:jr nc,2+$+1:add hl,de:add hl,bc
+					ld (colorzc),hl
+				ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

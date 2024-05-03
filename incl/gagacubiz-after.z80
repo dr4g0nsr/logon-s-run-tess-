@@ -1,0 +1,237 @@
+;splitz_invader
+;bubulle
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+splitz_invader.precalc
+				xor a:ld (splitz.pen+1),a
+				ld a,#4B:ld (splitz.ink+1),a
+				
+			; fixes!
+				ld hl,splitz_invader.subcall
+				ld de,splitz.tab
+				ld bc,#900
+					call splitz.precalc_and_fix
+
+			; splitz.unroll ... MOD!
+				ld hl,splitz_invader.data:exx
+				ld hl,splitz.unroll+2 ; (splitz.template.mod1-splitz.template) = 1 d'où INC
+				call splitz_invader.put_data 
+				ld hl,splitz.unroll+2 + 8*(splitz.template.ends_here-splitz.template)
+				call splitz_invader.put_data 
+								
+			; splitz.tab
+				ld hl,splitz.tab
+				xor a:ld b,#94:ld (hl),a:inc hl:djnz $-2
+				inc a:ld b,#10:ld (hl),a:inc hl:djnz $-2:inc a:cp 9:jr nz,$-9
+				xor a:ld b,#200-#94-#80:ld (hl),a:inc hl:djnz $-2
+				      ld b,#94:ld (hl),a:inc hl:djnz $-2
+				ld a,9:ld b,#10:ld (hl),a:inc hl:djnz $-2:inc a:cp 17:jr nz,$-9
+				xor a:ld b,#200-#94-#80:ld (hl),a:inc hl:djnz $-2
+				
+			; sinus précalculé avant :(
+			jp splitz_invader.preca
+			
+splitz_invader.put_data 	
+				ld c,12
+splitz_invader.precalc.loop0	
+					exx:ld a,(hl):inc hl:exx
+						push hl
+						ld b,8
+splitz_invader.precalc.loop1
+							add a,a
+							push af
+								jr nc,2+$+2:ld (hl),#49 ; #ED,#49 == OUT (C),C
+								ld de,splitz.template.mod2-splitz.template.mod1:add hl,de
+							pop af							
+							jr nc,2+$+2:ld (hl),#49 ; #ED,#49 == OUT (C),C
+							ld de,splitz.template.ends_here-(splitz.template.mod2-1):add hl,de
+							djnz splitz_invader.precalc.loop1
+						pop hl
+						inc hl:inc hl
+						dec c:jr nz,splitz_invader.precalc.loop0
+				ret
+							
+splitz_invader.data 	
+						db %00001110
+						db %00011000
+						db %10111110
+						db %01101101
+						db %00111101
+						db %00111100
+						db %00111101
+						db %01101101
+						db %10111110
+						db %00011000
+						db %00001110			
+						db %00000000			
+;	
+						db %01110000
+						db %00011001
+						db %10111110
+						db %01101100
+						db %00111100
+						db %00111100
+						db %00111100
+						db %01101100
+						db %10111110
+						db %00011001
+						db %01110000			
+						db %00000000
+													
+splitz_invader.subcall
+				ld hl,splitz.preca_invader
+				ld c,(hl):inc hl:ld a,(hl):inc hl
+				ld (splitz_invader.subcall+1),hl
+				ld l,c:ld h,a	
+				or c:jp z,splitz_event.ending
+				ld (splitz.template.adr_tab+1),hl
+				ret
+				
+splitz_invader.preca
+				ld de,splitz.preca_invader
+splitz_invader.sin1
+				ld hl,-3
+				inc hl:ld (splitz_invader.sin1+1),hl
+				ld a,h:cp 1:jr nz,splitz_invader.sin1.ok
+				ld a,l:cp 2:jr nz,splitz_invader.sin1.ok
+				xor a:ld (de),a:inc de:ld (de),a
+				ret										
+splitz_invader.sin1.ok
+				push hl
+				ld a,l
+				call @sys.sinus_16384 ; de 0 > #40 > -#40 > 0
+				xor a:bit 7,h:jr z,2+$+1:dec a
+				ld l,h:ld h,a
+				pop bc
+				add hl,bc
+				ld bc,splitz.tab+#10+#4
+				add hl,bc
+splitz_invader.sin_anim
+				ld a,0:inc a:cp 50:jr nz,2+$+1:xor a:ld (splitz_invader.sin_anim+1),a
+				sub 30:jr c,2+$+2:inc h:inc h	
+				ld a,l:ld (de),a:inc de
+				ld a,h:ld (de),a:inc de
+				jr splitz_invader.sin1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	; for GAGACUBIZ
+
+
+bubulle_init1	ld a,#C9:ld (scroller.inc_offset),a
+		 		ld hl,(scroller.int1+1):ld (bubulle_int1+1),hl
+				ld hl,bubulle_call1
+	 			ld de,bubulle_init2
+	 			ld bc,#24+4
+				jp sys.put_call_at_VBL
+bubulle_init2	ld hl,bubulle_call2
+	 			ld bc,8
+				jp sys.put_call_at_VBL_wo_last
+			
+	 		
+bubulle_init3	
+				if cond.colorz=1
+				ld a,#C9:ld (bubulle_int1_fix),a
+		  		ld hl,#1000:ld (scroller.int1+1),hl
+				endif
+				ld hl,bubulle_call1
+	 			ld de,bubulle_init4
+	 			ld bc,#80
+				jp sys.put_call_at_VBL
+bubulle_init4	xor a
+				if cond.colorz=1
+				else
+				ld (scroller.inc_offset),a
+				endif
+				ld hl,#01F0:ld (scroller.inc_scr+1),hl
+				;if debug.syncbreak				
+				;break
+				;endif
+				ret
+															
+bubulle_call2	
+bubulles.flash.adr_tab_pal
+				ld hl,bubulles.tab_pal
+				ld de,sys.7fc1.palette
+				ld bc,4:ldir
+				ld (bubulles.flash.adr_tab_pal+1),hl
+				ret ; ajout récent!
+bubulle_call1
+bubulle_ang		ld hl,0
+				ld bc,#38:add hl,bc:ld (bubulle_ang+1),hl
+				call @sys.cosinus_16bits
+				ex de,hl:ld hl,#4000:or a:sbc hl,de
+				srl h:rr l:srl h:rr l:srl h:rr l:srl h:rr l
+				ex de,hl
+				ld bc,#0C7C
+				call @sys.mul.16sx16s_24smax
+				ld a,b:and 3:ld d,a
+				ld a,b:and 12:add a,a:add a,a:add a,d:ld d,a
+				ld e,c
+				push de
+				ld bc,#1033
+bubulle_int1	 ld hl,0
+				ld de,#384
+				add hl,de:bit 2,h:jr z,2+$+4
+					ld a,h:add a,b:and c:ld h,a
+				ld (bubulle_int1+1),hl
+				pop de
+				add hl,de:bit 2,h:jr z,2+$+4
+					ld a,h:add a,b:and c:ld h,a
+				if cond.colorz=1
+bubulle_int1_fix
+				endif
+				ld (scroller.int1+1),hl
+			ret
+
+	
+bubulles.tab_pal
+	;db RGB100,RGB002,RGB200,RGB020
+	db RGB101,RGB002,RGB201,RGB021
+	db RGB102,RGB002,RGB202,RGB022
+	db RGB112,RGB012,RGB212,RGB022
+	db RGB122,RGB022,RGB222,RGB022
+;	db RGB222,RGB222,RGB222,RGB222 ; full white removed
+	db RGB022,RGB022,RGB022,RGB022
+	db RGB012,RGB012,RGB012,RGB012
+	db RGB002,RGB002,RGB002,RGB002
+	db RGB001,RGB002,RGB002,RGB001
+
+
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+bubulle_conv_1to2
+	; transforme 1 en 2
+		; generate table
+			ld hl,sys.conv_vram.tab
+			ld d,%11110000
+			ld e,%11111111
+bubulle_conv_1to2.loop			
+					; 1
+					ld a,l:and d:ld c,a
+					ld a,l:rlca:rlca:rlca:rlca ; hi to lo
+					xor e:and c
+					rlca:rlca:rlca:rlca:ld c,a
+					; 2
+					ld a,l:rlca:rlca:rlca:rlca ; hi to lo
+					xor e:ld b,a
+					ld a,l:and %00001111:and b
+				or c	
+				ld (hl),a
+				inc l
+				jr nz,bubulle_conv_1to2.loop			
+		; go!
+			call sys.conv_vram.convtab
+	; wait for vbl, if not: glitch!	
+			call sys.wait_int_vbl_is_over 	
+	; palette		
+			ld a,#44:ld (sys.ink1val),a
+			ld a,#55:ld (sys.ink3val),a
+		ret		
+	

@@ -1,0 +1,294 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz.precalc_and_fix
+				ld a,b:ld (splitz_synchro+1),a:ld a,c:ld (splitz_synchro+5),a
+				ld (splitz.subcall+1),hl
+				ex de,hl
+				ld (splitz.template.adr_tab+1),hl
+
+
+splitz.precalc
+		;précalc commun
+		
+			; splitz.unroll
+				ld hl,splitz.template
+				ld de,splitz.unroll	
+				ld bc,(splitz.template.ends_here-splitz.template)*1
+				ldir
+splitz.precalc.shunt
+				ld hl,splitz.unroll			
+				ld bc,(splitz.template.ends_here-splitz.template)*(splitz.unroll_nb-1)
+				ldir
+				
+			; splitz.tab_adr
+				ld hl,splitz.tab_adr
+				ld (hl),low splitz.template:inc hl:ld (hl),high splitz.template:inc hl
+				ld de,splitz.unroll	
+				ld bc,splitz.template.ends_here-splitz.template
+				ld a,splitz.unroll_nb
+splitz.precalc.loop0
+					ld (hl),e:inc hl:ld (hl),d:inc hl
+					ex de,hl:add hl,bc:ex de,hl
+					dec a:jr nz,splitz.precalc.loop0			
+				
+			; splitz.stack
+				ld hl,splitz.stack
+				ld (hl),#BC
+				ld de,splitz.stack+1
+				ld bc,34*4*2
+				ldir
+				ld (hl),low splitz.template.return
+				inc hl
+				ld (hl),high splitz.template.return
+				;
+				ld hl,splitz.stack.source_ldir
+				ld de,splitz.stack+( 6-4)*8+6:ld bc,16:ldir
+				ld de,splitz.stack+(19-4)*8+6:ld bc, 8:ldir
+				ld de,splitz.stack+(32-4)*8+6:ld bc, 4:ldir
+				ld hl,#7F9D:ld (splitz.stack+30*8),hl
+
+			ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz
+
+		; opérations afin de basculer vers le main loop
+			; wait la dernière interruption
+				call sys.wait_int_vbl_is_over
+				halt:halt:halt:halt:halt
+splitz_shunt
+			; zic en temps fixe
+				ld a,aks_fix_val:ld (aks_fix_adr),a
+			; interruption historique
+				ld a,#C9:ld (#FDFD),a
+			; wait presque 5 lignes de caractères
+				ld b,80:djnz $:djnz $:djnz $
+				
+			; what is vram base?				
+				ld hl,(scroller.int1+1):ld (splitz.int1+1),hl
+				ld hl,(scroller.inc_split+1):ld (splitz.inc_split+1),hl
+				ld hl,(scroller.inc_scr+1):ld (splitz.inc_scr+1),hl
+
+				jp splitz_loop.1st_entry
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+splitz_loop
+				halt
+				di
+
+			; zic, calculs
+				call aks_play
+					
+			; synchro
+splitz_synchro	ld b,8:djnz $:jr 2+$+1:nop:nop:nop
+
+				
+			; splitz main call
+				ld (splitz.template.return_sp+1),sp
+				ld sp,splitz.stack				
+				;
+splitz.pen
+				if cond.colorz
+				ld bc,#7F00
+				else
+				ld bc,#7F03
+				endif
+				out (c),c 	
+splitz.inkbis	ld hl,#5501 ; HL utilisé en fake pour la synchro par INC L / INC HL / ADD HL,HL
+splitz.inkter	ld de,#5A4C 
+				if cond.colorz
+splitz.ink		ld c,#5C ; C couleur par défaut pour les effets en 1 couleurs
+				ld a,#40 ; A couleur du fond
+				else
+splitz.ink		ld c,#5A
+				ld a,#5C
+				endif
+				exx
+				;
+				
+splitz.template.adr_tab
+				ld hl,splitz.tab+34*4
+				ld e,(hl)
+				sla e
+				inc hl 
+				ld ixh,34*4 ; 34 lignes de caractères, de 4 double-scanlines chacune
+				; bc sera écrasé
+				; h sera positionné
+				; /!\ a inchangé!!!
+				jp splitz.template.call_here
+splitz.template.return
+splitz.template.return_sp
+				ld sp,0
+				
+splitz_loop.1st_entry
+
+splitz.subcall call splitz_cubiz.subcall
+		
+			; crtc/vram setté avant la fin de la frame
+splitz.int1			ld hl,0
+					ld de,#1033
+				; inc avant!
+splitz.inc_scr		ld bc,0
+					add hl,bc:bit 2,h:ld a,h:jr z,2+$+3:add a,d:and e:ld h,a
+					ld (splitz.int1+1),hl
+				; envoi au crtc
+					ld bc,#BC0C
+					out (c),c
+					inc b
+					or c
+					out (c),a
+					dec b
+					inc c
+					out (c),c
+					inc b
+					out (c),l
+				; int2
+splitz.inc_split	ld bc,0
+					add hl,bc:bit 2,h:ld a,h:jr z,2+$+3:add a,d:and e:ld h,a
+					or #C:ld (splitz.int2_12),a
+					ld a,l:ld (splitz.int2_13),a
+				; int3
+					add hl,bc:bit 2,h:ld a,h:jr z,2+$+3:add a,d:and e:ld h,a
+					or #C:ld (splitz.int3_12),a
+					ld a,l:ld (splitz.int3_13),a
+					
+				; zic! calcul avant la fin de la frame
+					call aks_regs
+					
+				; loop
+					ei
+					jp splitz_loop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+splitz_event.ending.common
+			; crtc : follow-up!
+				ld hl,(splitz.int1+1):ld (scroller.int1+1),hl
+				xor a:ld (scroller.inc_offset),a
+;;;	break
+				call scroller.inc_offset ; l'appel est probable
+				
+			; back to normal interruptions
+				ld a,1:ld (aks_fix_adr),a
+				ld a,#C3:ld (#FDFD),a
+				ei
+				halt
+			ret
+
+splitz_event.ending
+				call splitz_event.ending.common				
+				
+			; clean work space
+				ld hl,splitz.clean_me
+				ld de,splitz.clean_me+1
+				ld bc,#E000-1-splitz.clean_me
+				ld (hl),0
+				ldir
+			pop hl:ret ; POP car y'a un CALL à dépiler
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; 2 fois 6 registres pour avoir la meilleure résolution
+	; ça nécessitera certes de la génération du code
+	; faut toujours un système similaire à COLORZ pour outer le crtc ET reset int par 7F9D
+	; DEC (8bit) et RET Z, y'a le temps de passer par un tableau (!) pour les N routines :)
+splitz.template
+				exx 		; 1 ==  1
+			; splirasters sur 48=12*4 avec 6 registres/couleurs différentes
+splitz.template.mod1
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4 == 48
+			; les OUTs vers le CRTC et sinon le reset de l'interruption par 7F9E
+				exx			; 1
+				pop bc		; 3
+				out (c),c	; 4
+				ex de,hl	; 1 <-
+				ld e,(hl)	; 2 <-
+				inc hl		; 2 <-
+				sla e		; 2 <-
+				exx			; 1 == 16 
+			; splirasters sur 48=12*4 avec 6 registres/couleurs différentes
+splitz.template.mod2
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4
+				out (c),a	; 4 == 48
+			; branchement conditionnel vers la double-ligne suivante, sinon c'est fini
+splitz.template.fix_close
+				exx			; 1
+				dec ixh		; 2
+				ret z		; 2
+splitz.template.call_here ; dans L = le contenu de (DE) cf les . ci-dessus
+				ex de,hl	; 1 <-
+				ld h,high splitz.tab_adr
+							; 2.
+				ld c,(hl)	; 2. 
+				inc l		; 1.
+				ld h,(hl)	; 2.
+				ld l,c		; 1
+				jp (hl)		; 1 == 15
+splitz.template.ends_here equ $+8
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+splitz.switch_inc_hl
+				ld a,#23 ; == INC HL
+				ld hl,splitz.template.mod1:call 3+$+3
+				ld hl,splitz.template.mod2
+				ld b,24:ld (hl),a:inc hl:djnz $-2
+				ret
+splitz.switch_out_a
+				ld de,#ED79 ; == OUT (C),A
+				ld hl,splitz.template.mod1:call 3+$+3
+				ld hl,splitz.template.mod2
+				ld b,12
+splitz.switch_out_a.loop ld (hl),d:inc hl:ld (hl),e:inc hl:djnz splitz.switch_out_a.loop
+				ret
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; après 9 frames
+; ça a descendu de 2 lignes de caractères
+; c'est décalé de 7*4 vers la gauche
+; y'a que 12 cas
+; +1 au dessus éventuel
+; +1 en dessous
+; pas besoin d'autre chose que d'avoir 2 couleurs :)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;inter.line_00_2	scroller.int1
+;      line_04      (début de l'écran visible)
+;inter.line_06_6	#BC04 #BD0A scroller.int2
+;inter.line_13_2
+;inter.line_19_6	scroller.int3
+;inter.line_26_2
+;inter.line_32_6	#BC04 #BD10
+splitz.stack.source_ldir
+				dw #BC04,#BD0A,#BC0C,#BD00,#BC0D,#BD00,#BC06,#BD0C 	; en (6-4)*8+6
+				dw             #BC0C,#BD00,#BC0D,#BD00 				; en (19-4)*8+6
+				dw #BC04,#BD10                         				; en (32-4)*8+6
+;				dw #7F9D                               				; en 30*8
+splitz.stack2 equ #FB00
+splitz.int2_12 equ splitz.stack2+   (6-4)*8+6  +4+2  	
+splitz.int2_13 equ splitz.stack2+   (6-4)*8+6  +4+2  +4	
+splitz.int3_12 equ splitz.stack2+  (19-4)*8+6    +2			
+splitz.int3_13 equ splitz.stack2+  (19-4)*8+6    +2  +4	

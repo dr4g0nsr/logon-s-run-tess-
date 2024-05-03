@@ -1,0 +1,524 @@
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	MAIN PART 1  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+main_part1_bis
+
+	; pre draw heart & dsk
+			call lite.pre_draw
+
+		; launch end (delete doyousea)
+			call scroller.vbank_off
+			call doyousea_delete
+			
+		; delete 3/4 VRAM + sprite buffer
+			ld hl,#0000:ld a,#C1:ld de,#4000+%00000000:call sys.fill_xxxx						
+			ld hl,#8000:ld a,#C1:ld de,#4000+%00000000:call sys.fill_xxxx						
+			
+			;if debug.synchro
+			;ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break ; wasted time, I know
+			;endif
+			call sys.wait.no_call_at_VBL
+
+		; "lite" i.e. 16KB VRAM and sprite w/o 3D
+ 			call lite.entry
+
+		; drawing background #8000 then vbank@C2 then #0000
+			ld a,51:call @rot.reset.scr_width_wo_set_CRTC
+			ld hl,#4000:ld a,#C2:ld de,#4000+%00000000:call sys.fill_xxxx						
+			ld hl,#C000:ld a,#C1:ld de,#2000+%00000000:call sys.fill_xxxx						
+			call scroller.vbank_on
+			call dragonfly_bg
+		; drawing last part #4000
+			ld hl,#4000:ld a,#C1:ld de,#4000+%00000000:call sys.fill_xxxx						
+			call dragonfly_bg.more
+			
+		; (re)set rot: spr /!\ especially for dragonfly, size has been optimized
+ 			ld c,6:	call @rot.reset.size_spr 			; 32x32...
+			ld a,#A8:ld (@rot.adr_spr_draw),a ; used = [C000..CC00[ ;;; #C0 ... & over sprite also
+			ld a,#B8:ld (@rot.adr_spr_fill),a ; used = [CC00..E000[ ;;; #CC
+ 
+		; draw dragonfly (background not seen yet, and colorz == green)
+			call dragonfly 
+ 			
+		; "lite" has ended?
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			endif
+			call sys.wait.no_call_at_VBL
+			ld hl,lite.ink_splash0:ld bc,10:call sys.put_call_at_VBL_wo_last
+	
+		; copy vbank to vram
+			ld ix,#C2C3:call sys.copy_4000
+			ld hl,#D000:ld a,#C2:ld de,#1000+%00000000:call sys.fill_xxxx						
+	
+		; colorz on dragonfly	
+			call colorz_precalc
+			call colorz
+		
+		ret
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	SPRITE 16K  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.fill_xxxx
+		ld a,#C1:call sys.set_7FCx
+		ld hl,#4000+48*2*12
+lite.fill_xxxx.loop
+		push hl
+		ld d,h:ld e,l:inc de:ld (hl),0:ld bc,#800-48*2*12-1:ldir
+		pop hl
+		ld a,h:add a,#8:ld h,a
+		bit 7,h:jr z,lite.fill_xxxx.loop
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lite.fill_xxxx_once
+						ld bc,#7FC1:out(c),c
+						ld de,48*2+#10000-#2000
+lite.fill_xxxx_once0	ld a,0
+						ld h,#40:ld l,a;ld hl,#4000
+						call lite.fill_xxxx_oncex
+						add a,2:ld (lite.fill_xxxx_once0+1),a
+						neg:add a,48*2:ld h,#48:ld l,a
+lite.fill_xxxx_once1	;ld hl,#4800+48*2-2
+						call lite.fill_xxxx_oncex
+						ld bc,#7FC2:out(c),c
+						ret						
+lite.fill_xxxx_oncex	ld bc,12*256+0
+							ld (hl),c:inc l:ld (hl),c:set 4,h:ld (hl),c:dec l:ld (hl),c:set 5,h
+							ld (hl),c:inc l:ld (hl),c:res 4,h:ld (hl),c:dec l:ld (hl),c;res 5,h
+							add hl,de
+							djnz lite.fill_xxxx_oncex+3
+						ret	
+						;ld b,4:ld (hl),0:inc l:ld (hl),0:dec l:ld a,h:add a,#10:ld h,a:djnz lite.fill_xxxx_oncex+2
+						;ld a,l
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite16k.put
+	; de = écran
+sprite16k.fix_bank
+		ld a,#C3:call sys.set_7FCx
+	; bc = sprite
+sprite16k.datasprite
+		ld bc,0
+		ld h,high @rot.tab.mask
+sprite16k.height
+		ld ixl,ny1 ; hauteur
+sprite16k.put.loopy
+		push de
+sprite16k.width
+			ld ixh,nx1 ; largeur
+sprite16k.adr_call			
+			call sprite16k.put.loopx	
+		pop de
+		ld a,d:add a,8:ld d,a
+		and #80:jr z,sprite16k.put.go2 ; ne marche qu'en bank #4000-#7FFF
+			ld a,d:sub #40:ld d,a
+			ld a,e:add a,52*2:ld e,a ; largeur écran
+			jr nc,sprite16k.put.go2
+				inc d:ld a,d:and 7
+				jr nz,sprite16k.put.go2
+					ld a,d:sub 8:ld d,a
+sprite16k.put.go2			
+		dec ixl:jr nz,sprite16k.put.loopy ; prochaine ligne
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite16k.put.loopx		ld a,(bc) ; sprite
+						ld l,a
+						ld a,(de) ; de l'écran
+						and (hl) ; écran masqué
+sprite16k.put.fix_del	or l ; #B5 == OR L  versus #00 = NOP
+						ld (de),a ; vers écran
+						inc bc ; sprite++
+						inc e:jr nz,sprite16k.put.go
+							inc d:ld a,d:and 7
+							jr nz,sprite16k.put.go
+								ld a,d:sub 8:ld d,a
+sprite16k.put.go
+			dec ixh:jr nz,sprite16k.put.loopx ; sur la même ligne		
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite16k.del.loopx		xor a
+						ld (de),a ; vers écran
+						inc e:jr nz,sprite16k.del.go
+							inc d:ld a,d:and 7
+							jr nz,sprite16k.del.go-1
+								ld a,d:sub 8:ld d,a
+				xor a
+sprite16k.del.go
+			dec ixh:jr nz,sprite16k.del.loopx+1 ; sur la même ligne		
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite16k.under.loopx	ex de,hl
+						ld e,(hl) ; écran
+						ex de,hl
+						ld a,(bc) ; sprite
+						and (hl) ; sprite masqué
+						ex de,hl
+						or (hl) ; or avec écran
+						ld (hl),a ; vers écran
+						inc bc ; sprite++
+						inc l:jr nz,sprite16k.under.go
+							inc h:ld a,h:and 7
+							jr nz,sprite16k.under.go
+								ld a,h:sub 8:ld h,a
+sprite16k.under.go
+			dec ixh:jr nz,sprite16k.under.loopx+1 ; sur la même ligne
+			ex de,hl		
+			ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sprite16k.keep_inks_2_and_3
+		ld a,#C3:call sys.set_7FCx
+		ld hl,#4000
+		ld b,%00001111
+sprite16k.keep_inks_2_and_3.loop0
+		ld a,(hl)
+		and b ; 1 if 2 or 3
+		ld c,a:rrca:rrca:rrca:rrca:or c ; all to 3
+		ld (hl),a
+		inc l
+		jr nz,sprite16k.keep_inks_2_and_3.loop0
+		inc h
+		bit 7,h
+		jr z,sprite16k.keep_inks_2_and_3.loop0
+		jp sys.set_7FC2
+		
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dollar.lite.delete_from_here
+main_part1
+	; gagacubiz
+		; init sprite
+			ld c,5:call @rot.reset.size_spr; ;;;+3; résiduel, la table de tab shift, qui sera créée en écrasant l'init ensuite / INUTILE plus de tab.shift
+	  		ld a,60:call @rot.reset.scr_width_wo_set_CRTC
+			ld a,adr_spr_fill_gagacubiz:ld (@rot.adr_spr_fill),a
+			ld a,adr_spr_draw_gagacubiz:ld (@rot.adr_spr_draw),a
+		
+ 		; precalculate
+			call gagacubiz_precalc2 ; précalc
+			call gagacubiz_precalc1a ; précalc
+
+ 		; in background display green (non-seen) cube
+			call sprite.switch_to_sprite ; unroll 
+			call gagacubiz_cube63 ; cubes sur bit 3
+			
+		; splitz i.e. cube displayed progressively by split
+			call splitz_cubiz.precalc
+			;if debug.syncbreak
+			;break ; idéalement synchro après la fin du triangle, cf init_intro.activate_triangle_end ???
+			;endif
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break ; see in gagacubiz / bubulle_init0 / BC reg
+			endif
+			call sys.wait.no_call_at_VBL
+			;ld a,60:ld (sys.crtcreg1val+1),a
+			ld hl,60*15:ld de,60*11:ld bc,#1068:call scroller.set_scr
+			if cond.colorz
+			ld a,#5A:ld (sys.ink3val),a
+			endif
+			call splitz
+
+			if cond.colorz=1
+	  		ld hl,#404B:ld (sys.ink1val),hl
+	  		endif
+	  		
+	 	; in background (non seen, other bit) big cube
+			call gagacubiz_cube18 ; cube en ink 1 et 2 par or sur 3 qui seul est visible
+			
+		; display big cube
+			ld de,gagacubiz_cube18_display:ld bc,timing_delay_cube18:call sys.put_call_at_VBL_wo_call
+
+	 	; other precalc which cannot be moved before (or: requires spaces!)
+			call gagacubiz_precalc1b ; précalc
+	
+	 	;  cubes 3 couleurs 
+			call gagacubiz_cube151
+			
+		 ; dernier plan de cubes jaune/rouge	
+			call gagacubiz_cube271
+			
+			call sys.wait.no_call_at_VBL
+			; precalc en parallèle possible???
+			
+		; doyousea prereq
+			ld c,5:call @rot.reset.size_spr ; 16x16
+			ld a,51:call @rot.reset.scr_width_wo_set_CRTC
+			ld a,adr_spr_fill_doyousea:ld (@rot.adr_spr_fill),a
+			ld a,adr_spr_draw_doyousea:ld (@rot.adr_spr_draw),a
+
+		; doyousea precalc 1/2
+ 			call doyousea_261_precalc ; vague
+
+		; for synchro only :( lost cputime
+			ld b,timing_before_invader:call sys.wait_int_vbl_is_over_djnz
+		; splitz avec invader
+			call splitz_invader.precalc		; code set in doyousea
+			call splitz
+
+		; for synchro only :( lost cputime
+			ld b,timing_after_invader:call sys.wait_int_vbl_is_over_djnz
+		; plan to stop scroll
+			call bubulle_init1
+			
+		; doyousea precalc 2/2
+			call doyousea_401_precalc ; ligne oblique
+	 		call doyousea_151_precalc ; flotteur à drapeau rouge
+
+		; wait up to splash
+			call sys.wait.no_call_at_VBL ; attend que le scroll se stoppe (!) (temps perdu)
+					
+		; reverse monochrome scrolling
+			call bubulle_init3 ; ça met un CALL sous interruption pour gérer la scrolling inverse accéléré
+			
+  		; set all used ink to pen 3
+			call bubulle_conv_1to2 ; que bit 2 d'utilisé je confirme, le 1er bit à 0 est dispo
+			
+		; doyousea / blue sea as background
+			if cond.colorz=1
+			ld hl,sys.ink1val:ld (hl),#40:inc hl:ld (hl),#55:inc hl:ld (hl),#40
+			ld a,51:ld (sys.crtcreg1val+1),a
+			endif
+			call @sprite.fix.andor.or_screen
+			ld hl,#D000:ld d,h:ld e,l:ld (hl),l:inc e:ld bc,#0FF:ldir
+			call doyousea_261_halfdraw	; <--- y'a plus le code là???
+			call doyousea_401_halfdraw
+
+		; stop on blue
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			call sys.wait.no_call_at_VBL
+			endif
+			
+			ld hl,#4455:ld (sys.ink1val),hl
+			ld a,51:ld (sys.crtcreg1val+1),a
+			ld hl,0*51*16:ld de,51*11:ld bc,#2000+#400-#165-51*4*0 ; +ou- 51*4 pour "voir" ce que çà prend
+				call scroller.set_scr
+			call sys.wait_int_vbl_is_over
+			call sys.conv_vram.resbit ; 2nd bit à 0
+			ld hl,#4A4C:ld (sys.ink2val),hl
+		
+		; copy to virtual vram bank
+			ld ix,#C3C2:call sys.copy_4000
+			ld hl,#D000:ld a,#C2:ld de,#1000+%00000000:call sys.fill_xxxx						
+	
+		; efface bord hors #C000 et change le splitscreen		
+			call splitz_close.precalc ; set code in dragonfly cos' splitz_sea requires it
+			call splitz
+			if cond.colorz=1
+			;ld b,#7F:ld hl,#034A:out (c),h:out (c),l:ld a,#4A:ld (sys.ink3val),a
+			ld bc,#BC0C:out (c),c:ld bc,#BD3E:out (c),c
+			ld bc,#BC0D:out (c),c:ld bc,#BDFD-51*2:out (c),c
+			endif
+			
+		; init display "LOGON SYSTEM" as interruption
+			ld hl,lg.int_call
+			ld de,lgdel.init
+			ld bc,-1
+			call sys.put_call_at_VBL 
+							
+		; background blue: last half
+ 			call doyousea_261_lastdraw
+ 			call doyousea_401_lastdraw
+		
+		; doyousea	/ foreground - 1st half ---> main part in virtual bank
+			call scroller.vbank_on
+			call @sprite.fix.andor.normal
+ 			call doyousea_151_halfdraw ; flotteur à drapeau rouge /// 318f.=6.5s
+			;break;6.5s.
+
+	 	; recopier la bank virtuelle vers la vraie vram par petit sprites
+	 		; déjà initialisé, cf  lgdel.init en fin de lg.int_call	
+ 			 			
+		; doyousea	/ foreground - last half
+  			call doyousea_151_lastdraw ; flotteur à drapeau rouge /// 388f.=8s.
+		  	;break;8s. presqu'autant depuis la fin d'affichage 100% du logo logon sans fioriture
+  	
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			call sys.wait.no_call_at_VBL
+			endif
+			
+		; display large screen cinemascope		
+			ld hl,doyousea_large.call_int
+			ld bc,timing_sea_large
+				call sys.put_call_at_VBL_wo_last
+				
+		; precalc next == dragonflybg
+			call dragonfly_bg_precalc ; <2s
+			;call dragonfly_precalc ; <3s.
+			
+			call splitz_sea.precalc
+
+			if debug.synchro
+			ld a,(sys.nb_calls_at_VBL+1):or a:jr z,2+$+2:break
+			endif
+			call sys.wait.no_call_at_VBL
+						
+		; passe en animation avec les bords noirs par splitz qui gère la transition...
+			call splitz_sea
+		; ... et revient à l'écran splitté comme attendu
+ 	
+		; "since" 1998 as background		
+			call splitz_since.precalc
+			call splitz
+			call splitz_year.precalc
+			call splitz
+			
+		; 1943
+			call splitz_1943.precalc
+			call splitz
+			
+		; precalc next == dragonflybg
+			call dragonfly_precalc ; <3s.
+			
+		; precalc next == dragonfly
+			call dragonfly_presegs ; 1s. doit suivre dragonfly_precalc 
+			ld a,adr_spr_fill_normal:ld (@rot.adr_spr_fill),a
+			ld a,adr_spr_draw_normal:ld (@rot.adr_spr_draw),a
+			
+		; suite... (== lite)
+		
+			jp main_part1_bis
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; LOGON ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+dollar.lg.delete_from_here
+lg.put_lin_7FC3
+	push bc:ld bc,#7FC3:out (c),c:pop bc
+				ld a,(bc):ld l,a:inc bc:ld a,(bc):ld h,a:inc bc 		
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:inc hl:inc  e
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:inc hl:inc de
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:dec hl:inc  e 
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:dec hl:inc de
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:dec hl:inc  e
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:inc hl:inc de
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a:inc hl:inc  e 
+				ld a,(de):and (hl):inc hl:or (hl):ld (de),a
+	push bc:ld bc,#7FC2:out (c),c:pop bc
+	ret
+				
+				
+lg.put_lin.lgh_tab		
+		dw	lghx,lghx,lghx,lghx,lghx,lgh5,lgh5
+		dw	          lghx,lghx,lghx,lghx,lgh3,lgh3,lgh5
+		dw	                    lghx,lghx,lghx,lgh2,lgh2,lgh3,lgh5
+		dw	                              lghx,lghx,lgh1,lgh1,lgh2,lgh3,lgh5
+		dw	                                        lghx,lghx,lgh1,lgh1,lgh2,lgh3,lgh5
+		dw	                                                  lgh0,lgh0,lgh1,lgh1,lgh2,lgh3,lgh5
+lg.put_lin.lgh_tab.ends
+; 1111 1111 32 pixels de large, soit 4 caractères ou 8 octets – les 6 du milieu en dur
+; 0111 1111
+; 0011 1111
+; 0001 1111
+; 0000 0111
+; ...
+	;	mask		byte 		mask		byte
+lghx	db 	%11111111,	%00000000,	%11111111,	%00000000,	%11111111,	%00000000,	%11111111,	%00000000,	%11111111,	%00000000	; -t
+lgh5	db 	%11111111,	%00000000,	%10001000,	%00000111,	%00000000,	%00001111,	%00010001,	%00001110,	%11111111,	%00000000	; -5
+lgh3	db	%11101110,	%00000001,	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111,	%01110111,	%00001000	; -3
+lgh2	db	%11001100,	%00000011,	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111,	%00110011,	%00001100	; -2
+lgh1 	db	%10001000,	%00000111,	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111,	%00010001,	%00001110	; -1
+lgh0	db	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111,	%00000000,	%00001111	;  0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lg.put_col_left_7FC3
+	push bc:ld bc,#7FC3:out (c),c:pop bc
+	ld a,(hl):and d:or e:ld (hl),a:set 3,h ; 0>1
+	ld a,(hl):and d:or e:ld (hl),a:set 4,h ; 1>3
+	ld a,(hl):and d:or e:ld (hl),a:res 3,h ; 3>2
+	ld a,(hl):and d:or e:ld (hl),a:set 5,h ; 2>6
+	ld a,(hl):and d:or e:ld (hl),a:set 3,h ; 6>7
+	ld a,(hl):and d:or e:ld (hl),a:res 4,h ; 7>5
+	ld a,(hl):and d:or e:ld (hl),a:res 3,h ; 5>4
+	ld a,(hl):and d:or e:ld (hl),a:res 5,h ; 4>0
+	push bc:ld bc,#7FC2:out (c),c:pop bc
+	ret
+lg.put_col_right_7FC3
+	push bc:ld bc,#7FC3:out (c),c:pop bc
+	ld (hl),e:set 3,h ; 0>1
+	ld (hl),e:set 4,h ; 1>3
+	ld (hl),e:res 3,h ; 3>2
+	ld (hl),e:set 5,h ; 2>6
+	ld (hl),e:set 3,h ; 6>7
+	ld (hl),e:res 4,h ; 7>5
+	ld (hl),e:res 3,h ; 5>4
+	ld (hl),e:res 5,h ; 4>0
+	push bc:ld bc,#7FC2:out (c),c:pop bc
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lgsy.put_col_7FC3
+	push bc:ld bc,#7FC3:out (c),c:pop bc
+	ld a,(hl):and d:or e:ld (hl),a:set 3,h ; 0>1
+	ld a,(hl):and d:or e:ld (hl),a:set 4,h ; 1>3
+	ld a,(hl):and b:or c:ld (hl),a:res 3,h ; 3>2
+	ld a,(hl):and b:or c:ld (hl),a:res 4,h ; 2>0
+	push bc:ld bc,#7FC2:out (c),c:pop bc
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lgsy.put_lin_7FC3
+	push bc:ld bc,#7FC3:out (c),c:pop bc
+	ld a,(hl):and d:or e:ld (hl),a:set 3,h ; 0>1
+	ld a,(hl):and d:or e:ld (hl),a:res 3,h ; 0>1
+	push bc:ld bc,#7FC2:out (c),c:pop bc
+	ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+lgdel.restore_7FC3
+			ld bc,#7FC3:out (c),c
+			ld c,lgdel.hcar
+lgdel.restore_loop1
+			ld b,6
+lgdel.restore_loop0
+			ld a,(de):ld (hl),a:set 3,h:inc de
+			ld a,(de):ld (hl),a:set 4,h:inc de
+			ld a,(de):ld (hl),a:res 3,h:inc de
+			ld a,(de):ld (hl),a:set 5,h:inc de
+			ld a,(de):ld (hl),a:set 3,h:inc de
+			ld a,(de):ld (hl),a:res 4,h:inc de
+			ld a,(de):ld (hl),a:res 3,h:inc de
+			ld a,(de):ld (hl),a:res 5,h:inc de
+			inc hl:djnz lgdel.restore_loop0
+			ld a,l:add a,51*2-6:ld l,a:jr nc,2+$+1:inc h
+			dec c:jr nz,lgdel.restore_loop1
+			ld bc,#7FC2:out (c),c
+			ret
+lg.ends_here
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; a priori n'est pas utilisé après doyousea
+sys.conv_vram.common	
+			ld a,#C1:call sys.set_7FCx
+			ld hl,#4000:ld c,#80
+				call sys.conv_vram.gen
+			ld a,#C3:call sys.set_7FCx
+			ld hl,#0000:ld c,#C0
+				call sys.conv_vram.gen
+		jp sys.set_7FC2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+sys.conv_vram.loop_low	
+				ld a,(hl):and d:ld (hl),a:inc l			;4
+				jp nz,sys.conv_vram.gen		
+				inc h:ld a,h:cp c
+				jp nz,sys.conv_vram.gen					
+				ret		  								;10
+			
