@@ -1,5 +1,12 @@
 echo DUMMY >output\tess2C00.pck
 echo DUMMY >output\tessC000.pck
+echo DUMMY >incbin\deadend.bin
+echo DUMMY >incbin\deu.bin
+echo DUMMY >incbin\fnl.bin
+echo DUMMY >incbin\lgn.bin
+echo DUMMY >incbin\mro.bin
+echo DUMMY >incbin\sin.bin
+echo DUMMY >incbin\spr.bin
 
 tools\sjasmplus.exe --lst=output\tess.lst --sym=output\tess.sym tess.z80
 if %errorlevel% neq 0 pause
