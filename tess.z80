@@ -3,69 +3,68 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; compilation conditionnelle
+; Conditional compilation
 
-cond.sna_E000=1				; 0 nécessaire pour exe final via exo ; 1 pour générer des binaires à inclure dans un snapshot
-cond.colorz=0				; 1 pour une version montrant ce qui ne devrait pas être vu
+cond.sna_E000=1             ; 0 necessary for final execution via exo; 1 to generate binaries to include in a snapshot
+cond.colorz=0               ; 1 for a version showing what should not be seen
 
-debug.quickstart=0			; quick start for testing some part at run
-debug.final=0				; inclus l'include du final hors du pack pour une exécution sans depacker en test
-debug.synchro=0				; BREAK conditionnel (dont: dans A le nb de CALLs/VBL résiduels genre flash avant transition
-debug.syncbreak=0			; BREAK judicieux mais systematique (WIP)
-debug.flag_VBL=0			; BREAK s'il y a une int VBL durant si longtemps qu'il y a la suivante
-debug.flag_blankspr=0		; BREAK si jamais on essaye d'afficher un sprite blank (y'aurait erreur qqpart)
-debug.sprite_ready=0		; BREAK au début du put sprite (qui est dessiné donc, vérifiable avant d'aller à l'écran)
-debug.convex_merge=0		; BREAK avant le fill/put d'un sprite d'avant-plan en surimpression d'un sprite d'arrière-plan
+debug.quickstart=0          ; Quick start for testing some parts at runtime
+debug.final=0               ; Includes the final include outside the pack for execution without unpacking in testing
+debug.synchro=0             ; Conditional BREAK (including: in A the number of CALLs/VBL remaining, like flash before transition)
+debug.syncbreak=0           ; Sensible but systematic BREAK (Work In Progress)
+debug.flag_VBL=0            ; BREAK if there is an int VBL for so long that the next one occurs
+debug.flag_blankspr=0       ; BREAK if we ever try to display a blank sprite (there would be an error somewhere)
+debug.sprite_ready=0        ; BREAK at the beginning of put sprite (which is drawn, so, verifiable before going to the screen)
+debug.convex_merge=0        ; BREAK before the fill/put of a foreground sprite in superimposition of a background sprite
 
-obsolete.letitbig=0			; BREAK sur le nb de nop-cycles à rattraper, si +3=12 octets sur une ligne, vérif buffer stockage
-obsolete.store_steps=0		; BREAK en debut et fin de la routine stockant les steps (usage: taille de la data générée)
-obsolete.store_pts=0		; BREAK en debut et fin de la routine stockant les points (usage: taille de la data générée)	
-obsolete.store_segs=0		; BREAK en debut et fin de la routine stockant les segments (usage: taille de la data générée)
-obsolete.logostart=0		; logo de test, mis, enlevé, remis...
-obsolete.colstart=0			; colonne s'élargissant au tout début, très bof
+obsolete.letitbig=0         ; BREAK on the number of nop-cycles to catch up, if +3=12 bytes on a line, buffer storage check
+obsolete.store_steps=0      ; BREAK at the beginning and end of the routine storing the steps (usage: size of the generated data)
+obsolete.store_pts=0        ; BREAK at the beginning and end of the routine storing the points (usage: size of the generated data)
+obsolete.store_segs=0       ; BREAK at the beginning and end of the routine storing the segments (usage: size of the generated data)
+obsolete.logostart=0        ; Test logo, put, removed, put back...
+obsolete.colstart=0         ; Column widening at the very beginning, very blah
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; timings
-timing_init_intro_basic				equ 100+85	; keep basic screen w/o CLS
-timing_init_intro_blue				equ 50-20	; keep blue screen (incl. blue border)
-timing_init_intro_bar				equ 489-65	; >=489 timing for loading bar /!\ set by debugging
-timing_init_intro_bar_y				equ 18		; nb frames / bar falling from top /!\ centered
-;timing_init_intro_bar_t			equ 107		; (logostart only)
-;timing_init_intro_bar_f			equ 50		; (logostart only)
-timing_delay_cube18					equ 45		; before XL cube is displayed
-timing_before_invader				equ 75		; timing set with much lost cputime - for synchro only :(
-timing_after_invader				equ 25		; with all layers, before it stops - much lost cputime - for synchro only :(
-timing_lgtempo_before				equ 55			; .
-timing_lgtempo_middle				equ 1			; ..
-timing_lgdel						equ 178-55-1	; ... /!\ SUM /!\ set by debugging (?)
-timing_sea_large					equ 243-#90	; /!\ set by debugging (?) - call dragonfly_precalc MOVED
-timing_sea_black					equ 100-20	; boats on black border
-timing_sfx							equ 100		; SFX displayed on screen
-timing_lite_dsk						equ 186		; /!\ set for nice stop-moving hearts
-timing_lite_ghost					equ 62	 	; >=62 set by debug
-timing_colorz						equ 450 	;
-timing_dragonfly_red				equ 305		; nicely set 		
-timing_donkey						equ 100-25		
-timing_mario_epsilon				equ 2+10+5			
-timing_engrenages				 	equ 48*6-20-10+5; .		
-timing_engrenages_mario_rubber		equ 48*6+35		; ..
-timing_rubber						equ 48*7+8-10	; ... /!\ sum!
-timing_transit0						equ 1
-timing_transit_freq_square			equ 24
-timing_gb_before_on					equ 20+30
-timing_gb_with_logo					equ 80+70
-timing_gb_off						equ 20+25
-timing_txt_final_speed				equ 10
+; Timings
+timing_init_intro_basic                equ 100+85    ; Keep basic screen without CLS
+timing_init_intro_blue                 equ 50-20     ; Keep blue screen (including blue border)
+timing_init_intro_bar                  equ 489-65    ; >=489 timing for loading bar /!\ set by debugging
+timing_init_intro_bar_y                equ 18        ; Number of frames / bar falling from top /!\ centered
+;timing_init_intro_bar_t               equ 107       ; (logostart only)
+;timing_init_intro_bar_f               equ 50        ; (logostart only)
+timing_delay_cube18                    equ 45        ; Before XL cube is displayed
+timing_before_invader                  equ 75        ; Timing set with much lost CPU time - for synchronization only :(
+timing_after_invader                   equ 25        ; With all layers, before it stops - much lost CPU time - for synchronization only :(
+timing_lgtempo_before                  equ 55          ; .
+timing_lgtempo_middle                  equ 1           ; ..
+timing_lgdel                           equ 178-55-1    ; ... /!\ SUM /!\ set by debugging (?)
+timing_sea_large                       equ 243-#90     ; /!\ set by debugging (?) - call dragonfly_precalc MOVED
+timing_sea_black                       equ 100-20      ; Boats on black border
+timing_sfx                             equ 100         ; SFX displayed on screen
+timing_lite_dsk                        equ 186         ; /!\ set for nice stop-moving hearts
+timing_lite_ghost                      equ 62          ; >=62 set by debug
+timing_colorz                          equ 450         ;
+timing_dragonfly_red                   equ 305         ; Nicely set
+timing_donkey                          equ 100-25      
+timing_mario_epsilon                   equ 2+10+5      
+timing_engrenages                      equ 48*6-20-10+5   ; .        
+timing_engrenages_mario_rubber         equ 48*6+35        ; ..
+timing_rubber                          equ 48*7+8-10      ; ... /!\ sum!
+timing_transit0                        equ 1
+timing_transit_freq_square             equ 24
+timing_gb_before_on                    equ 20+30
+timing_gb_with_logo                    equ 80+70
+timing_gb_off                          equ 20+25
+timing_txt_final_speed                 equ 10
 
-
-; misc.
-sprite.unroll_nb 					equ 27
-exomizer							equ #F34A
-offset_logo_at_start				equ #8008+48-7+120*8 ; offset for logo at start (if used)
-crtc_reg3							equ #0C
+; Miscellaneous
+sprite.unroll_nb                      equ 27
+exomizer                              equ #F34A
+offset_logo_at_start                  equ #8008+48-7+120*8 ; Offset for logo at start (if used)
+crtc_reg3                             equ #0C
 
 ; synchro/glitches
 offset_gagacubiz 					equ	#0400
@@ -88,7 +87,7 @@ cube151.store_pts 		equ buffer	-#1100-#1550-#17B0		; #1798
 ;
 
 ; generated for splitz  /!\ empty this before letting next part use this place
-splitz.unroll_nb equ 43  ; en plus du template qui est utilisé aussi			
+splitz.unroll_nb equ 43  ; en plus du template qui est utilisï¿½ aussi			
 splitz.clean_me			equ 	#D000
 splitz.unroll			equ		#D000 
 splitz.tab				equ		#D600
@@ -137,7 +136,7 @@ dragonfly.store_segs 	equ buffer	-#0414-#06CC-#016E-#10AA-#B34	; #0B33
 ;		gagacubiz	length<#2700
 ;#D100
 ;
-; --> org dragonfly tel que dragonfly (suivi de doyouseau+gagacubiz) ne dépasse pas #9700 - décompressé de base
+; --> org dragonfly tel que dragonfly (suivi de doyouseau+gagacubiz) ne dï¿½passe pas #9700 - dï¿½compressï¿½ de base
 
 
 ; "colorz", once "dragonfly" is drawn = does not need buffers for 3D object/sprite
@@ -167,7 +166,7 @@ letitbig.crtc_offset			equ #3000
 letitbig.adr_vram				equ #C000 ; #60 i.e. screen width et en +#800 aussi (reg9=1)
 letitbig.code					equ #C700 ; #100(-) /!\ cos out #7FC2 and <#FDFD
 letitbig.eat1stlines.code		equ #C600 ; #100(-) /!\ cos out #7FC2 and <#FDFD
-letitbig.rasters				equ #C500 ; #88 et peut-être #80 à terme
+letitbig.rasters				equ #C500 ; #88 et peut-ï¿½tre #80 ï¿½ terme
 letitbig.code.copy_buffer		equ #FD00 ; <#FDFD
 ; 								#7FC2
 letitbig.precalc.buffer_max 	equ #E000								;letitbig.precalc.buffer+#880
@@ -185,18 +184,18 @@ letitbig.mod.tab_conv 			equ #D900; #400
 letitbig.mod.unroll_decrunch	equ #D700; #200
 letitbig.mod.conv_nomask		equ #D600; #100
 letitbig.mod.sprite				equ #D600-#4000
-letitbig.mod.buffer_sp			equ #D600-#880 ; sera recouvert à la fin mais qu'importe :)
+letitbig.mod.buffer_sp			equ #D600-#880 ; sera recouvert ï¿½ la fin mais qu'importe :)
 
 
-; LETITBIG after				; laisser #C000-#E000 dispo comme buffer écran pour le final
-letitbig.after.spr_gen			equ #EF00-#800 ; <#800 forcément après la recopie du backup du fond
+; LETITBIG after				; laisser #C000-#E000 dispo comme buffer ï¿½cran pour le final
+letitbig.after.spr_gen			equ #EF00-#800 ; <#800 forcï¿½ment aprï¿½s la recopie du backup du fond
 letitbig.after.backup_bg_temp	equ #EF00-#600 ; <#600
-letitbig.after.backup_bg		equ #C000-#600 ; <#600	; effaçable dès que le logon est affiché et ne bouge plus
+letitbig.after.backup_bg		equ #C000-#600 ; <#600	; effaï¿½able dï¿½s que le logon est affichï¿½ et ne bouge plus
 letitbig.after.spr_msk			equ #C000-#600-#400 ; <#400 
 letitbig.after.spr_lgn			equ #C000-#600-#400-#1000 ; 4*#400
 
 
-; final							; note: écran gameboy en C0:0000
+; final							; note: ï¿½cran gameboy en C0:0000
 adr_spr_fill_final				equ #C000 ; pas de convexe?
 adr_spr_draw_final				equ #C000
 adr_spr_final					equ #C000
@@ -215,7 +214,7 @@ final.put_txt.nb_ch 			equ 39
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; code et données, partie basse en 0000/7FC2
+; code et donnï¿½es, partie basse en 0000/7FC2
 
 		output "output/tess0000.bin"
 			org  #0000
@@ -261,7 +260,7 @@ tessC000.pck.length equ $-tessC000.pck
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; code et données, 3ème partie 
+; code et donnï¿½es, 3ï¿½me partie 
 
 		output "output/tess2C00.bin"
 			org  #2C00
@@ -294,7 +293,7 @@ letitbig.lgn_data incbin "incbin/lgn.bin"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; code et données, 2nde partie 
+; code et donnï¿½es, 2nde partie 
 
 		output "output/tessC000.bin"
 			org  #C000
@@ -378,7 +377,7 @@ dollar.temp = $
 			if cond.sna_E000
 				di:ld sp,sys.stack
 			endif
-			; entrée supposé en 7FC3 (rappel)
+			; entrï¿½e supposï¿½ en 7FC3 (rappel)
 				jp init_intro
 
 				include "incl/7fc1.z80"
@@ -415,7 +414,7 @@ dollar.temp = $
 
 rot.tab.convobj.1pt		defs #0005,0 ; 1+max.convobj*1,0 ; n* pt, -1 ends
 rot.tab.sides_seen 		defs #000F,0 ; max.sides,0 ; seen if value>0
-rot.tab.adr_convobj		defs #000C,0 ; max.convobj*3,0 ; translation.n°(8bits),adr to rot.tab.convobj
+rot.tab.adr_convobj		defs #000C,0 ; max.convobj*3,0 ; translation.nï¿½(8bits),adr to rot.tab.convobj
 rot.tab.z_convobj 		defs (rot.tab.sides_seen-rot.tab.convobj.1pt-1)*3+1 ,0 ; 1+rot.max.convobj*3,0 ; flag(8bits),&z(16bits) ... -1 ends
 rot.tab.sides_full	 	defs #008C,0 ; ((rot.tab.sides.ends-rot.tab.sides)+(1+3)*rot.max.sides),0 ; calculation is not accurate? it is
 rot.tab.convobj			defs #0028,0 ; rot.max.convobj+rot.max.segs+rot.max.segs_twice,0 ; for N convobj (list of segments, -1 ends)
@@ -444,7 +443,7 @@ sys.conv_vram.gen		;equ rot.tab.trans_ink+#100 	; defs #100	+8-1 /!\ beware it u
 						defs #100
 				display "[",dollar.temp,"] ",$-dollar.temp," > TAB inc. (some require 7FC1/3)"	
 rot.tab.pts_spr 		;equ #FD00 ; defs rot.max.pts*2,0 ; n* (x,y)(8 bits)
-splitz.tab_adr			;equ rot.tab.pts_spr 		; des mots (126 max) pour l'adresse des différents code par scanline 
+splitz.tab_adr			;equ rot.tab.pts_spr 		; des mots (126 max) pour l'adresse des diffï¿½rents code par scanline 
 letitbig.code_FD00
 				display "[0xFD00]        > TAB for n<126 pts () / exo_mapbasebits / JP INT en #FDFD"
 				display "[0xFE00] 0x0102 > IM2"
@@ -465,7 +464,7 @@ do_not_cross				equ #F0EB
 
 							; used most of the time
 							;
-sprite.unroll				equ	#EFC0 ; #127 si sprite.unroll_nb=27 (décimal)
+sprite.unroll				equ	#EFC0 ; #127 si sprite.unroll_nb=27 (dï¿½cimal)
 sprite.unroll.fix.andor 				equ sprite.unroll+sprite.unroll_nb*10-2-5
 sprite.unroll.ends						equ sprite.unroll+sprite.unroll_nb*10-2		
 sprite.width6							equ sprite.unroll.ends+3
@@ -503,11 +502,11 @@ deulignes.scroller.tabvar	equ #EF00-#100
 							; used by let it big
 							;
 letitbig.precalc.buff_l0	equ #EF00 ; #40 
-						;            +#40 ; table déplacée pour @rot
-						;            +#80 ; table déplacée pour @rot
+						;            +#40 ; table dï¿½placï¿½e pour @rot
+						;            +#80 ; table dï¿½placï¿½e pour @rot
 letitbig.precalc.buff_l1	equ #EF00-#100 ; #40; reste #C0=96*2
 letitbig.precalc.ldhl		equ letitbig.precalc.buff_l1+#40 ; 96 * LD(HL),r:INC L	
-letitbig.precalc.mask		equ #EF00-#100-#200 ; 48*2=96 octets = la largeur de l'écran - 2 fois
+letitbig.precalc.mask		equ #EF00-#100-#200 ; 48*2=96 octets = la largeur de l'ï¿½cran - 2 fois
 							assert letitbig.precalc.mask>=main_part1
 							;display "letitbig.precalc.mask-main_part1=",letitbig.precalc.mask-main_part1
 
@@ -518,5 +517,5 @@ letitbig.precalc.mask		equ #EF00-#100-#200 ; 48*2=96 octets = la largeur de l'éc
 							;display "letitbig.after.spr_gen-dollar.letitbig_7FC1=",letitbig.after.spr_gen-dollar.letitbig_7FC1
 
 				
-							; utilisable une fois letitbig fini et after-letitbig en // à final
+							; utilisable une fois letitbig fini et after-letitbig en // ï¿½ final
 							;display dollar.final.delete_from_here
