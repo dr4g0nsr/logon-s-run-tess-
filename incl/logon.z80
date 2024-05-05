@@ -37,7 +37,7 @@ lg.script.tab_call
 		dw 	lgsy.put_lin_first													; lignes doubles de SYSTEM
 		dw 	lgsy.put_lin_first,lgsy.put_lin_first.fix_for_E,lgsy.put_lin_first	; lignes internes de SYSTEM
 		dw  lgsy.tempo_middle													; temporisation
-		dw 	lg.put_lin_first 													; barres résiduelles du LOGON
+		dw 	lg.put_lin_first 													; barres rsiduelles du LOGON
 		dw 	lg.put_col_first 													; reste horizontal LOGON
 		dw 	lgsy.put_col_first 													; reste vertical SYSTEM
 		dw 	lg.script_ends
@@ -98,7 +98,7 @@ lg.put_lin_5lines	; BC=qlqpart dans lgtab ;
 lg.put_lin_1line.pre_inc		
 				ld a,e:sub 7:ld e,a:jr nc,2+$+1:dec d
 				ld a,d:add a,8:bit 6,a:jr nz,lg.put_lin_1line-1 ; ne marche qu'en #4000 (sinon #C000)
-					ld a,e:add a,lg.width_scr*2:ld e,a:ld a,d:jr nc,2+$+1:inc a:sub #38 ; +1 ligne de caractère
+					ld a,e:add a,lg.width_scr*2:ld e,a:ld a,d:jr nc,2+$+1:inc a:sub #38 ; +1 ligne de caractre
 				ld d,a
 lg.put_lin_1line
 				ld a,ixh:cp 5:jr nz,2+$+4:ld (lg.put_lin_adr+1),de
@@ -156,7 +156,7 @@ lg.put_col_32lines_left
 	call lg.put_col_8lines_left
 	call lg.put_col_8lines_left.pre_inc
 lg.put_col_8lines_left.pre_inc
-	ld a,l:add a,lg.width_scr*2:ld l,a :jr nc,2+$+1:inc h
+	ld a,l:add a,lg.width_scr*2:ld l,a:jr nc,2+$+1:inc h
 lg.put_col_8lines_left
 	jp lg.put_col_left_7FC3
 	
@@ -166,7 +166,7 @@ lg.put_col_32lines_right
 	call lg.put_col_8lines_right
 	call lg.put_col_8lines_right.pre_inc
 lg.put_col_8lines_right.pre_inc
-	ld a,l:add a,lg.width_scr*2:ld l,a :jr nc,2+$+1:inc h
+	ld a,l:add a,lg.width_scr*2:ld l,a:jr nc,2+$+1:inc h
 lg.put_col_8lines_right
 	jp lg.put_col_right_7FC3
 	

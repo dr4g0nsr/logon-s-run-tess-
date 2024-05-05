@@ -36,11 +36,13 @@ cd ..
 copy /B /Y tools\a.pck output\tess.pck
 
 tools\sjasmplus.exe --lst=output\dsk.lst --sym=output\dsk.sym dsk.z80
-if %errorlevel% neq 0  pause
+if %errorlevel% neq 0 pause
 
 cd output
-..\tools\cpcfs.exe "..\tess.dsk" d "229:logon's.bak"
-..\tools\cpcfs.exe "..\tess.dsk" d "229:logon's."
-..\tools\cpcfs.exe "..\tess.dsk" d "logon's."
-..\tools\cpcfs.exe "..\tess.dsk" p "logon's." -b
+cpcfs.exe "..\tess.dsk" d "229:logon's.bak"
+cpcfs.exe "..\tess.dsk" d "229:logon's."
+cpcfs.exe "..\tess.dsk" -p "logon's."
+cpcfs.exe "..\tess.dsk" p "logon's." -b
 cd ..
+
+pause
