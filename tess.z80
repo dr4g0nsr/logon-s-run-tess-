@@ -136,7 +136,7 @@ dragonfly.store_segs 	equ buffer	-#0414-#06CC-#016E-#10AA-#B34	; #0B33
 ;		gagacubiz	length<#2700
 ;#D100
 ;
-; --> org dragonfly tel que dragonfly (suivi de doyouseau+gagacubiz) ne d�passe pas #9700 - d�compress� de base
+; --> Adjust dragonfly org such that dragonfly (followed by doyouseau+gagacubiz) does not exceed #9700 - decompressed base
 
 
 ; "colorz", once "dragonfly" is drawn = does not need buffers for 3D object/sprite
@@ -151,7 +151,7 @@ colorz_tab_c 			equ buffer-#9A6*3  	; length=9A6
 ; deulignes
 adr_spr_fill_deulignes			equ #D000+#500
 adr_spr_draw_deulignes			equ #C000+#500+#900
-adr_spr_deulignes				equ #D200 ; adresse utile i.e. en dessous c'est utilisable
+adr_spr_deulignes				equ #D200 ; Useful address i.e. below it is usable
 deulignes4.mario_sprite 		equ #DA00	; sur #600
 deulignes.data_background_blk	equ #D800	; #200
 
@@ -166,7 +166,7 @@ letitbig.crtc_offset			equ #3000
 letitbig.adr_vram				equ #C000 ; #60 i.e. screen width et en +#800 aussi (reg9=1)
 letitbig.code					equ #C700 ; #100(-) /!\ cos out #7FC2 and <#FDFD
 letitbig.eat1stlines.code		equ #C600 ; #100(-) /!\ cos out #7FC2 and <#FDFD
-letitbig.rasters				equ #C500 ; #88 et peut-�tre #80 � terme
+letitbig.rasters				equ #C500 ; #88 Maybe #80 in the end
 letitbig.code.copy_buffer		equ #FD00 ; <#FDFD
 ; 								#7FC2
 letitbig.precalc.buffer_max 	equ #E000								;letitbig.precalc.buffer+#880
@@ -184,19 +184,19 @@ letitbig.mod.tab_conv 			equ #D900; #400
 letitbig.mod.unroll_decrunch	equ #D700; #200
 letitbig.mod.conv_nomask		equ #D600; #100
 letitbig.mod.sprite				equ #D600-#4000
-letitbig.mod.buffer_sp			equ #D600-#880 ; sera recouvert � la fin mais qu'importe :)
+letitbig.mod.buffer_sp			equ #D600-#880 ; It will be covered in the end, but it doesn't matter :)
 
 
-; LETITBIG after				; laisser #C000-#E000 dispo comme buffer �cran pour le final
-letitbig.after.spr_gen			equ #EF00-#800 ; <#800 forc�ment apr�s la recopie du backup du fond
+; LETITBIG after				; #C000-#E000 Available as a screen buffer for the final
+letitbig.after.spr_gen			equ #EF00-#800 ; <#800 Of course, after copying the background backup
 letitbig.after.backup_bg_temp	equ #EF00-#600 ; <#600
-letitbig.after.backup_bg		equ #C000-#600 ; <#600	; effa�able d�s que le logon est affich� et ne bouge plus
+letitbig.after.backup_bg		equ #C000-#600 ; <#600	; Erasable as soon as the logon is displayed and doesn't move anymore
 letitbig.after.spr_msk			equ #C000-#600-#400 ; <#400 
 letitbig.after.spr_lgn			equ #C000-#600-#400-#1000 ; 4*#400
 
 
-; final							; note: �cran gameboy en C0:0000
-adr_spr_fill_final				equ #C000 ; pas de convexe?
+; final							; note: Gameboy screen in C0:0000
+adr_spr_fill_final				equ #C000 ; No convex?
 adr_spr_draw_final				equ #C000
 adr_spr_final					equ #C000
 final.scroller_o				equ 2048*3-5*96-3*96
@@ -214,7 +214,7 @@ final.put_txt.nb_ch 			equ 39
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; code et donn�es, partie basse en 0000/7FC2
+; Code and data, lower part in 0000/7FC2
 
 		output "output/tess0000.bin"
 			org  #0000
